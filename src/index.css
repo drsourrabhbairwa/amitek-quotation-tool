@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+/*
+  The app picks its accent color (amber for Seamless Floorings, teal for
+  Waterproofing) at runtime and builds a couple of class names by string
+  interpolation (e.g. `focus:ring-${accent}-700`). Tailwind only generates
+  CSS for classes it can see as a complete, literal string somewhere in the
+  source — it never executes JS — so those two interpolated classes need to
+  be safelisted here explicitly, or their styling will silently disappear
+  in the production build.
+  See: https://tailwindcss.com/docs/detecting-classes-in-source-files#safelisting-specific-utilities
+*/
+@source inline("focus:ring-{amber,teal}-700");
+@source inline("hover:bg-amber-800");
+@source inline("hover:bg-teal-700");
+
+body {
+  margin: 0;
+}

@@ -1,0 +1,50 @@
+name: Deploy to GitHub Pages
+
+# NOTE: GitHub Pages' free tier only serves PUBLIC repositories, and a
+# public repo means anyone can read this source — including the Systems
+# seeded in src/lib/constants.js (your real rates, HSN codes, coverage
+# figures).
+# If that pricing data should stay private, don't use this workflow as-is;
+# see the "Keeping this private" section of README.md for alternatives
+# (a private repo + Cloudflare Pages/Netlify/Vercel, or your own server).
+#
+# To use this workflow: push this repo to GitHub, then in the repo's
+# Settings -> Pages, set "Source" to "GitHub Actions".
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
