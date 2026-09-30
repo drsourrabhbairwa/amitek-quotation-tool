@@ -3,8 +3,10 @@ import { Plus, Loader2 } from 'lucide-react';
 import { DIVISIONS } from './lib/constants';
 import { blankQuotation, convertToProformaInvoice } from './lib/model';
 import { loadDivisionData, saveDivisionData, exportBackup, importBackupFile } from './lib/storage';
+import { supabase } from './lib/supabaseClient';
 import { Btn } from './components/ui/atoms';
 import { DivisionPicker } from './components/DivisionPicker';
+import { LoginScreen } from './components/LoginScreen';
 import { TopNav } from './components/TopNav';
 import { AdminPanel } from './components/admin/AdminPanel';
 import { QuotationBuilder } from './components/QuotationBuilder';
@@ -41,14 +43,30 @@ export default function App() {
   const [savingState, setSavingState] = useState('idle');
   const [draft, setDraft] = useState(null);
   const savingTimer = useRef(null);
+  const [session, setSession] = useState(undefined); // undefined = still checking, null = signed out
+  const [loadError, setLoadError] = useState(null);
 
   useEffect(() => {
-    (async () => {
-      const [sf, wp] = await Promise.all([loadDivisionData('sf'), loadDivisionData('wp')]);
-      setData({ sf, wp });
-      setLoading(false);
-    })();
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => setSession(newSession));
+    return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const [sf, wp] = await Promise.all([loadDivisionData('sf'), loadDivisionData('wp')]);
+        setData({ sf, wp });
+      } catch (e) {
+        setLoadError(e.message || 'Could not load your data.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [session]);
 
   const persist = useCallback(async (divKey, newDivData) => {
     setSavingState('saving');
@@ -107,6 +125,8 @@ export default function App() {
     await persist(division, newDivData);
   };
 
+  const handleSignOut = () => supabase.auth.signOut();
+
   const handleImportFile = async (file) => {
     try {
       const parsed = await importBackupFile(file);
@@ -122,6 +142,27 @@ export default function App() {
       window.alert("Couldn't read that file — is it a backup previously exported from this tool?");
     }
   };
+
+  if (session === undefined) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center text-slate-400">
+        <Loader2 className="animate-spin mr-2" size={18} /> Checking your login…
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <LoginScreen />;
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4 gap-3">
+        <div className="text-red-600 text-sm max-w-sm">{loadError}</div>
+        <Btn variant="outline" onClick={() => setSession(s => ({ ...s }))}>Try again</Btn>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -152,6 +193,7 @@ export default function App() {
         savingState={savingState}
         onExport={() => exportBackup(data)}
         onImportFile={handleImportFile}
+        onSignOut={handleSignOut}
       />
       {view === 'admin' && (
         <AdminPanel div={div} systems={divData.systems} onChangeSystems={handleChangeSystems} />

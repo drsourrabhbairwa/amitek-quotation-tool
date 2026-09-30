@@ -1,8 +1,8 @@
 import React, { useRef } from 'react';
-import { FileText, History, Settings2, ArrowLeft, Download, Upload, SlidersHorizontal } from 'lucide-react';
+import { FileText, History, Settings2, ArrowLeft, Download, Upload, SlidersHorizontal, LogOut } from 'lucide-react';
 import { SavingIndicator } from './ui/atoms';
 
-export function TopNav({ div, view, setView, onSwitchDivision, savingState, onExport, onImportFile }) {
+export function TopNav({ div, view, setView, onSwitchDivision, savingState, onExport, onImportFile, onSignOut }) {
   const tabs = [
     { key: 'new', label: 'New Quotation', Icon: FileText },
     { key: 'history', label: 'History', Icon: History },
@@ -31,6 +31,9 @@ export function TopNav({ div, view, setView, onSwitchDivision, savingState, onEx
               <Upload size={16} />
             </button>
             <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={(e) => { if (e.target.files?.[0]) onImportFile(e.target.files[0]); e.target.value = ''; }} />
+            <button onClick={onSignOut} title="Sign out" className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded">
+              <LogOut size={16} />
+            </button>
           </div>
         </div>
         <div className="flex gap-1 -mb-px overflow-x-auto">
