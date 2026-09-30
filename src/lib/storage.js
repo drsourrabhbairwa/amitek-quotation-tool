@@ -1,72 +1,81 @@
-import { STORAGE_KEYS, LEGACY_STORAGE_KEYS, SEED_SF, SEED_WP } from './constants';
 import { migrateDivisionData } from './model';
-import { defaultSettings } from './settings';
 import { todayStr } from './ids';
+import { supabase } from './supabaseClient';
 
 /* ============================================================
    STORAGE
-   This build targets a normal browser, so it uses localStorage rather
-   than Claude's artifact-only window.storage API. That means the data
-   lives in THIS browser on THIS device only — it will not follow you
-   to another computer or sync between colleagues. Use the Backup /
-   Restore buttons in the top bar regularly, especially before clearing
-   browser data or switching machines.
+   Data lives in Supabase now — shared across every signed-in device,
+   not just this browser. loadDivisionData/saveDivisionData keep the
+   exact same names and shapes they had as the localStorage version,
+   so nothing above this module needs to know the backend changed.
    ============================================================ */
 
-export const LS_AVAILABLE = (() => {
-  try {
-    const t = '__amitek_probe__';
-    window.localStorage.setItem(t, '1');
-    window.localStorage.removeItem(t);
-    return true;
-  } catch (e) { return false; }
-})();
+function currentYear() {
+  return new Date().getFullYear();
+}
 
 export async function loadDivisionData(divKey) {
-  if (LS_AVAILABLE) {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEYS[divKey]);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && Array.isArray(parsed.systems)) return migrateDivisionData(parsed, divKey);
-      }
-      // nothing at the current-version key — check for pre-Settings data
-      // saved under the old key and upgrade it in place rather than
-      // silently reseeding over someone's real Systems/quotations.
-      const legacyRaw = window.localStorage.getItem(LEGACY_STORAGE_KEYS[divKey]);
-      if (legacyRaw) {
-        const parsedLegacy = JSON.parse(legacyRaw);
-        if (parsedLegacy && Array.isArray(parsedLegacy.systems)) {
-          const migrated = migrateDivisionData(parsedLegacy, divKey);
-          try { window.localStorage.setItem(STORAGE_KEYS[divKey], JSON.stringify(migrated)); } catch (e) { /* storage full/disabled */ }
-          return migrated;
-        }
-      }
-    } catch (e) { /* corrupted value, fall through to seed */ }
+  const { data: row, error } = await supabase
+    .from('division_data')
+    .select('systems, quotations, settings')
+    .eq('division_key', divKey)
+    .single();
+  if (error || !row) {
+    throw new Error(`Could not load ${divKey} data: ${error?.message || 'no row found'}`);
   }
-  const seeded = {
-    systems: divKey === 'sf' ? SEED_SF() : SEED_WP(),
-    quotations: [],
-    counterYear: new Date().getFullYear(),
-    counterNext: 1,
-    piCounterYear: new Date().getFullYear(),
-    piCounterNext: 1,
-    settings: defaultSettings(divKey),
-  };
-  if (LS_AVAILABLE) {
-    try { window.localStorage.setItem(STORAGE_KEYS[divKey], JSON.stringify(seeded)); } catch (e) { /* storage full/disabled */ }
+
+  const { data: counterRows, error: counterErr } = await supabase
+    .from('counters')
+    .select('doc_type, year, next_number')
+    .eq('division_key', divKey);
+  if (counterErr) {
+    throw new Error(`Could not load ${divKey} counters: ${counterErr.message}`);
   }
-  return seeded;
+
+  const year = currentYear();
+  const findNext = (docType) => (counterRows || []).find(c => c.doc_type === docType && c.year === year)?.next_number ?? 1;
+
+  return migrateDivisionData({
+    systems: row.systems,
+    quotations: row.quotations,
+    settings: row.settings,
+    counterYear: year,
+    counterNext: findNext('quotation'),
+    piCounterYear: year,
+    piCounterNext: findNext('proforma'),
+  }, divKey);
 }
 
 export async function saveDivisionData(divKey, data) {
-  if (!LS_AVAILABLE) return false;
-  try { window.localStorage.setItem(STORAGE_KEYS[divKey], JSON.stringify(data)); return true; }
-  catch (e) { return false; }
+  // counterYear/counterNext/piCounterYear/piCounterNext are informational
+  // (kept for backup/export completeness) — the counters table is the
+  // source of truth for actually assigning numbers, via getNextCounterNumber
+  // below, so they're deliberately not written here.
+  const { systems, quotations, settings } = data;
+  const { error } = await supabase
+    .from('division_data')
+    .update({ systems, quotations, settings, updated_at: new Date().toISOString() })
+    .eq('division_key', divKey);
+  return !error;
+}
+
+/** Atomically assigns and returns the next raw counter integer for a
+ * division/docType/year — the database-side fix for two people saving
+ * at nearly the same moment (see supabase/schema.sql increment_counter).
+ * Throws on failure so the caller (QuotationBuilder.handleSave) can show
+ * a clear "couldn't save" message instead of silently assigning nothing. */
+export async function getNextCounterNumber(divKey, docType) {
+  const { data, error } = await supabase.rpc('increment_counter', {
+    p_division_key: divKey,
+    p_doc_type: docType,
+    p_year: currentYear(),
+  });
+  if (error) throw new Error(`Could not assign the next reference number: ${error.message}`);
+  return data;
 }
 
 export function exportBackup(data) {
-  const payload = { app: 'amitek-quotation-tool', version: 2, exportedAt: new Date().toISOString(), sf: data.sf, wp: data.wp };
+  const payload = { app: 'amitek-quotation-tool', version: 3, exportedAt: new Date().toISOString(), sf: data.sf, wp: data.wp };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
