@@ -79,23 +79,17 @@ export function fmt(n) {
 }
 
 /**
- * Assigns the next reference number for a division, and bumps its
- * counter. Quotations and Proforma Invoices are numbered in two
- * separate series (own prefix, own yearly counter) — pass docType
- * 'proforma' to draw from the PI series instead of the default
- * quotation series. The caller spreads everything but `refNo` from the
- * result back into the division's saved data to persist the bump.
+ * Builds the display reference-number string for a division/docType and
+ * an already-assigned counter integer. Pure and synchronous — the
+ * integer itself now comes from storage.js `getNextCounterNumber`, an
+ * atomic database call, not from in-memory state (see schema.sql
+ * `increment_counter`: two people saving at once can no longer be
+ * handed the same number).
  */
-export function nextRefNo(divKey, data, settings, docType = 'quotation') {
+export function formatRefNo(divKey, settings, docType, number) {
   const isPI = docType === 'proforma';
   const year = new Date().getFullYear();
-  let counterYear = (isPI ? data.piCounterYear : data.counterYear) || year;
-  let counterNext = (isPI ? data.piCounterNext : data.counterNext) || 1;
-  if (counterYear !== year) { counterYear = year; counterNext = 1; }
   const prefix = (settings && (isPI ? settings.piNumberingPrefix : settings.numberingPrefix))
     || `AMK/${isPI ? 'PI' : 'QTN'}/${divKey.toUpperCase()}`;
-  const refNo = `${prefix}/${year}/${String(counterNext).padStart(3, '0')}`;
-  return isPI
-    ? { refNo, piCounterYear: counterYear, piCounterNext: counterNext + 1 }
-    : { refNo, counterYear, counterNext: counterNext + 1 };
+  return `${prefix}/${year}/${String(number).padStart(3, '0')}`;
 }

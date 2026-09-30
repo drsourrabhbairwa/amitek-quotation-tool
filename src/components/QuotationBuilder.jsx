@@ -4,7 +4,8 @@ import { Btn, PrintOrientationStyle } from './ui/atoms';
 import { SystemPicker } from './quotation/SystemPicker';
 import { QuotationDocument } from './quotation/QuotationDocument';
 import { systemToLineItem, blankCustomLineItem, blankSectionRow } from '../lib/model';
-import { nextRefNo } from '../lib/calc';
+import { formatRefNo } from '../lib/calc';
+import { getNextCounterNumber } from '../lib/storage';
 import { downloadQuotationPdf } from '../lib/pdf';
 
 export function QuotationBuilder({ div, systems, draft, setDraft, onSaved, divData, setDivData, persist, settings }) {
@@ -22,18 +23,21 @@ export function QuotationBuilder({ div, systems, draft, setDraft, onSaved, divDa
 
   const handleSave = async () => {
     let refNo = q.refNo;
-    let newDivData = divData;
     if (!refNo) {
-      const { refNo: generatedRefNo, ...counterUpdate } = nextRefNo(div.key, divData, settings, q.docType);
-      refNo = generatedRefNo;
-      newDivData = { ...divData, ...counterUpdate };
+      try {
+        const number = await getNextCounterNumber(div.key, q.docType);
+        refNo = formatRefNo(div.key, settings, q.docType, number);
+      } catch (e) {
+        window.alert("Couldn't assign a reference number — check your connection and try again. Nothing was saved.");
+        return;
+      }
     }
     const finalQ = { ...q, refNo, updatedAt: Date.now() };
-    const exists = newDivData.quotations.some(x => x.id === finalQ.id);
+    const exists = divData.quotations.some(x => x.id === finalQ.id);
     const newQuotations = exists
-      ? newDivData.quotations.map(x => x.id === finalQ.id ? finalQ : x)
-      : [...newDivData.quotations, finalQ];
-    newDivData = { ...newDivData, quotations: newQuotations };
+      ? divData.quotations.map(x => x.id === finalQ.id ? finalQ : x)
+      : [...divData.quotations, finalQ];
+    const newDivData = { ...divData, quotations: newQuotations };
     setDraft(finalQ);
     setDivData(newDivData);
     await persist(newDivData);

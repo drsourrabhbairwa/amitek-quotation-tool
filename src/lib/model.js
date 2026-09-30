@@ -85,7 +85,8 @@ export function blankQuotation(div, settings) {
 /** Produces a new Proforma Invoice seeded from an already-saved
  * quotation: same client, line items, columns, and letterhead/bank/
  * terms snapshots — just a fresh id, a blank ref number (a PI gets its
- * own numbering series on save, see calc.js `nextRefNo`), and docType
+ * own numbering series on save, see storage.js `getNextCounterNumber`
+ * and calc.js `formatRefNo`), and docType
  * flipped to 'proforma'. Never mutates the source quotation; the two
  * remain independently editable afterwards. */
 export function convertToProformaInvoice(quotation) {
