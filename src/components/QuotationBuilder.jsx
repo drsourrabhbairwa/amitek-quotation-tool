@@ -8,7 +8,7 @@ import { formatRefNo } from '../lib/calc';
 import { getNextCounterNumber } from '../lib/storage';
 import { downloadQuotationPdf } from '../lib/pdf';
 
-export function QuotationBuilder({ div, systems, draft, setDraft, onSaved, divData, setDivData, persist, settings }) {
+export function QuotationBuilder({ div, systems, draft, setDraft, onSaved, divData, setDivData, saveQuotation, settings }) {
   const q = draft;
   const docRef = useRef(null);
   const printRef = useRef(null);
@@ -33,14 +33,22 @@ export function QuotationBuilder({ div, systems, draft, setDraft, onSaved, divDa
       }
     }
     const finalQ = { ...q, refNo, updatedAt: Date.now() };
+    setDraft(finalQ);
+    try {
+      // Saved as a single record (see lib/storage.js upsertQuotation) so
+      // this never overwrites a quotation the other signed-in user saved
+      // moments ago — the old approach sent this browser's whole
+      // quotations array back, built from whatever it last loaded.
+      await saveQuotation(finalQ);
+    } catch (e) {
+      window.alert("Couldn't save — check your connection and try again. Your reference number was already assigned, so saving again will update this same document rather than skipping a number.");
+      return;
+    }
     const exists = divData.quotations.some(x => x.id === finalQ.id);
     const newQuotations = exists
       ? divData.quotations.map(x => x.id === finalQ.id ? finalQ : x)
       : [...divData.quotations, finalQ];
-    const newDivData = { ...divData, quotations: newQuotations };
-    setDraft(finalQ);
-    setDivData(newDivData);
-    await persist(newDivData);
+    setDivData({ ...divData, quotations: newQuotations });
     onSaved && onSaved(finalQ);
   };
 

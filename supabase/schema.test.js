@@ -66,3 +66,59 @@ describe('increment_counter', () => {
     expect(second).toBe(7);
   });
 });
+
+describe('per-record division_data writes (concurrent-save safety)', () => {
+  let db;
+
+  beforeAll(async () => {
+    db = await freshDb();
+  });
+
+  afterAll(async () => {
+    await db.close();
+  });
+
+  const quotations = async (divKey) =>
+    (await db.query(`select quotations from division_data where division_key = $1`, [divKey])).rows[0].quotations;
+
+  it('upsert_quotation appends a new id and leaves other rows\' data untouched', async () => {
+    await db.query(`select upsert_quotation($1, $2::jsonb)`, ['sf', JSON.stringify({ id: 'q1', refNo: 'A1' })]);
+    await db.query(`select upsert_quotation($1, $2::jsonb)`, ['wp', JSON.stringify({ id: 'q-wp', refNo: 'W1' })]);
+    expect(await quotations('sf')).toEqual([{ id: 'q1', refNo: 'A1' }]);
+    expect(await quotations('wp')).toEqual([{ id: 'q-wp', refNo: 'W1' }]);
+  });
+
+  it('upsert_quotation replaces the existing entry with the same id instead of duplicating it', async () => {
+    await db.query(`select upsert_quotation($1, $2::jsonb)`, ['sf', JSON.stringify({ id: 'q1', refNo: 'A1-edited' })]);
+    expect(await quotations('sf')).toEqual([{ id: 'q1', refNo: 'A1-edited' }]);
+  });
+
+  it('simulates two users racing: both saves survive because each is computed against the row as it stood at call time, not a stale client snapshot', async () => {
+    // User A loads the row (currently just q1), then User B saves a brand
+    // new quotation q2 before A's own save reaches the server.
+    await db.query(`select upsert_quotation($1, $2::jsonb)`, ['sf', JSON.stringify({ id: 'q2', refNo: 'A2' })]);
+    // User A's save now runs — under the old whole-blob design this would
+    // have sent back A's stale in-memory array (just q1) and erased q2.
+    // The RPC instead recomputes server-side, so q2 survives.
+    await db.query(`select upsert_quotation($1, $2::jsonb)`, ['sf', JSON.stringify({ id: 'q1', refNo: 'A1-second-edit' })]);
+    const rows = await quotations('sf');
+    expect(rows.map(r => r.id).sort()).toEqual(['q1', 'q2']);
+    expect(rows.find(r => r.id === 'q1').refNo).toBe('A1-second-edit');
+    expect(rows.find(r => r.id === 'q2').refNo).toBe('A2');
+  });
+
+  it('delete_quotation removes only the matching id', async () => {
+    await db.query(`select delete_quotation($1, $2)`, ['sf', 'q2']);
+    expect((await quotations('sf')).map(r => r.id)).toEqual(['q1']);
+  });
+
+  it('replace_systems and replace_settings write only their own column', async () => {
+    await db.query(`select replace_systems($1, $2::jsonb)`, ['wp', JSON.stringify([{ id: 'sys1' }])]);
+    await db.query(`select replace_settings($1, $2::jsonb)`, ['wp', JSON.stringify({ gstin: 'TEST123' })]);
+    const row = (await db.query(`select systems, settings, quotations from division_data where division_key = 'wp'`)).rows[0];
+    expect(row.systems).toEqual([{ id: 'sys1' }]);
+    expect(row.settings).toEqual({ gstin: 'TEST123' });
+    // Untouched by either call:
+    expect(row.quotations).toEqual([{ id: 'q-wp', refNo: 'W1' }]);
+  });
+});

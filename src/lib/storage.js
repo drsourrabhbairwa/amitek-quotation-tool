@@ -46,17 +46,63 @@ export async function loadDivisionData(divKey) {
   }, divKey);
 }
 
+/** @deprecated Overwrites the whole systems+quotations+settings row from
+ * whatever this browser currently holds in memory — if another signed-in
+ * user saved anything in between this browser's last load and this call,
+ * that change is silently erased. Kept only for the explicit, user-confirmed
+ * "restore from backup file" flow (App.jsx handleImportFile), which is
+ * meant to replace everything. Every other save goes through one of the
+ * per-record functions below instead. */
 export async function saveDivisionData(divKey, data) {
-  // counterYear/counterNext/piCounterYear/piCounterNext are informational
-  // (kept for backup/export completeness) — the counters table is the
-  // source of truth for actually assigning numbers, via getNextCounterNumber
-  // below, so they're deliberately not written here.
   const { systems, quotations, settings } = data;
   const { error } = await supabase
     .from('division_data')
     .update({ systems, quotations, settings, updated_at: new Date().toISOString() })
     .eq('division_key', divKey);
   return !error;
+}
+
+/** Saves one quotation/proforma-invoice without touching anything else in
+ * the division row — inserts it if its id is new, replaces it in place if
+ * not. Computed entirely server-side (see supabase/schema.sql
+ * upsert_quotation) against the row as it stands at call time, so it can
+ * never clobber a quotation the other signed-in user saved moments ago. */
+export async function upsertQuotation(divKey, quotation) {
+  const { error } = await supabase.rpc('upsert_quotation', {
+    p_division_key: divKey,
+    p_quotation: quotation,
+  });
+  if (error) throw new Error(`Could not save: ${error.message}`);
+}
+
+/** Removes one quotation/proforma-invoice by id, leaving every other
+ * quotation and the systems/settings columns untouched. */
+export async function deleteQuotationRow(divKey, quotationId) {
+  const { error } = await supabase.rpc('delete_quotation', {
+    p_division_key: divKey,
+    p_quotation_id: quotationId,
+  });
+  if (error) throw new Error(`Could not delete: ${error.message}`);
+}
+
+/** Replaces the Systems list for a division without touching its
+ * quotations or settings columns. */
+export async function replaceSystems(divKey, systems) {
+  const { error } = await supabase.rpc('replace_systems', {
+    p_division_key: divKey,
+    p_systems: systems,
+  });
+  if (error) throw new Error(`Could not save Systems: ${error.message}`);
+}
+
+/** Replaces the Settings object for a division without touching its
+ * quotations or systems columns. */
+export async function replaceSettings(divKey, settings) {
+  const { error } = await supabase.rpc('replace_settings', {
+    p_division_key: divKey,
+    p_settings: settings,
+  });
+  if (error) throw new Error(`Could not save Settings: ${error.message}`);
 }
 
 /** Atomically assigns and returns the next raw counter integer for a

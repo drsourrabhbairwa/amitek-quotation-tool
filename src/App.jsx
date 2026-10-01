@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
 import { DIVISIONS } from './lib/constants';
 import { blankQuotation, convertToProformaInvoice } from './lib/model';
-import { loadDivisionData, saveDivisionData, exportBackup, importBackupFile } from './lib/storage';
+import { loadDivisionData, saveDivisionData, upsertQuotation, replaceSystems, replaceSettings, deleteQuotationRow, exportBackup, importBackupFile } from './lib/storage';
 import { supabase } from './lib/supabaseClient';
 import { Btn } from './components/ui/atoms';
 import { DivisionPicker } from './components/DivisionPicker';
@@ -68,12 +68,25 @@ export default function App() {
     })();
   }, [session]);
 
-  const persist = useCallback(async (divKey, newDivData) => {
+  // Wraps one Supabase write with the saving/saved/error indicator. Each
+  // caller below writes only the single column it changed (via the
+  // per-record functions in lib/storage.js), computed server-side against
+  // the row as it stands at call time — not the whole division blob — so
+  // two signed-in people saving around the same moment can't silently
+  // erase each other's changes (see supabase/schema.sql's upsert_quotation
+  // and friends for how that's made atomic).
+  const withSavingState = useCallback(async (fn) => {
     setSavingState('saving');
-    const ok = await saveDivisionData(divKey, newDivData);
-    setSavingState(ok ? 'saved' : 'error');
-    if (savingTimer.current) clearTimeout(savingTimer.current);
-    savingTimer.current = setTimeout(() => setSavingState('idle'), 1800);
+    try {
+      await fn();
+      setSavingState('saved');
+    } catch (e) {
+      setSavingState('error');
+      throw e;
+    } finally {
+      if (savingTimer.current) clearTimeout(savingTimer.current);
+      savingTimer.current = setTimeout(() => setSavingState('idle'), 1800);
+    }
   }, []);
 
   const divData = division ? data[division] : null;
@@ -83,19 +96,25 @@ export default function App() {
   };
 
   const handleChangeSystems = async (newSystems) => {
-    const newDivData = { ...divData, systems: newSystems };
-    setData(prev => ({ ...prev, [division]: newDivData }));
-    await persist(division, newDivData);
+    setData(prev => ({ ...prev, [division]: { ...prev[division], systems: newSystems } }));
+    try {
+      await withSavingState(() => replaceSystems(division, newSystems));
+    } catch (e) {
+      window.alert("Couldn't save Systems — check your connection and try again.");
+    }
   };
 
   const handleChangeSettings = async (newSettings) => {
-    const newDivData = { ...divData, settings: newSettings };
-    setData(prev => ({ ...prev, [division]: newDivData }));
-    await persist(division, newDivData);
+    setData(prev => ({ ...prev, [division]: { ...prev[division], settings: newSettings } }));
+    try {
+      await withSavingState(() => replaceSettings(division, newSettings));
+    } catch (e) {
+      window.alert("Couldn't save Settings — check your connection and try again.");
+    }
   };
 
-  const handlePersistDivData = async (newDivData) => {
-    await persist(division, newDivData);
+  const saveQuotation = async (quotation) => {
+    await withSavingState(() => upsertQuotation(division, quotation));
   };
 
   const pickDivision = (key) => {
@@ -120,9 +139,12 @@ export default function App() {
   };
 
   const deleteQuotation = async (id) => {
-    const newDivData = { ...divData, quotations: divData.quotations.filter(x => x.id !== id) };
-    setData(prev => ({ ...prev, [division]: newDivData }));
-    await persist(division, newDivData);
+    setData(prev => ({ ...prev, [division]: { ...prev[division], quotations: prev[division].quotations.filter(x => x.id !== id) } }));
+    try {
+      await withSavingState(() => deleteQuotationRow(division, id));
+    } catch (e) {
+      window.alert("Couldn't delete — check your connection and try again.");
+    }
   };
 
   const handleSignOut = () => supabase.auth.signOut();
@@ -209,7 +231,7 @@ export default function App() {
           setDraft={setDraft}
           divData={divData}
           setDivData={setDivDataAndPersist(division)}
-          persist={handlePersistDivData}
+          saveQuotation={saveQuotation}
           settings={divData.settings}
           onSaved={() => setView('history')}
         />
