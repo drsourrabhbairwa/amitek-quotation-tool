@@ -63,54 +63,70 @@ Invoice, and a searchable history of everything created.
   columns it was created with, so editing Settings later never silently
   changes an already-sent quotation.
 
-## ⚠️ Read this first: how data is stored
+## How data is stored
 
-This build saves everything to your **browser's local storage**
-(`localStorage`) — not to a server, not to the cloud. That means:
+Everything — both divisions' Systems and quotation/Proforma Invoice
+history — lives in a shared **Supabase** (Postgres) database, not in the
+browser. That means:
 
-- Your Systems and quotation history live in **one browser, on one device**.
-- Opening the site in a different browser, a different computer, or in
-  private/incognito mode starts you off with a **fresh copy of the seed
-  data** — none of your saved quotations follow you there.
-- Clearing your browser's site data / cache will **delete everything**.
+- Both signed-in users see the **same** data, from any device, anywhere
+  with internet — not just one browser on one computer.
+- Signing in is required (Supabase Auth, email + password). There is no
+  role split between the two accounts — either one has full read/write
+  access to both divisions.
+- Saving a quotation, a Systems edit, or a Settings change writes only
+  that one record to the database (see `supabase/schema.sql`'s
+  `upsert_quotation` / `delete_quotation` / `replace_systems` /
+  `replace_settings` functions) — so two people saving at nearly the same
+  moment can't silently erase each other's changes.
+- Reference numbers (quotation/Proforma Invoice, per division, per year)
+  are assigned by an atomic database function (`increment_counter`), so
+  two people saving at once can never be handed the same number.
 
-**Use the ⬇ Download and ⬆ Upload buttons in the top bar regularly.** Download
-exports a single JSON file with everything (both divisions' Systems and
-quotation history); Upload restores from that file. Treat that file like you
-would a spreadsheet backup — keep a copy somewhere safe (email it to
-yourself, save it to Drive/Dropbox, etc.), especially before switching
-computers or clearing browser data.
-
-If you outgrow this later and want quotations to sync across devices or be
-shared with colleagues, the fix is swapping the storage layer for a small
-free-tier backend (Firebase or Supabase) instead of `localStorage` — ask
-and it can be added.
+**Use the ⬇ Download button in the top bar periodically anyway** — it
+exports a JSON snapshot of both divisions' Systems and quotation history.
+It's not your only copy of the data any more (Supabase is), but it's a
+handy point-in-time backup to keep somewhere safe.
 
 ## Running it locally
 
-Requires [Node.js](https://nodejs.org) 18 or newer.
+Requires [Node.js](https://nodejs.org) 18 or newer, and a `.env` file with
+your Supabase project's URL and anon/publishable key (see `.env.example`).
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the URL it prints (usually `http://localhost:5173`).
+Open the URL it prints (usually `http://localhost:5173`). You'll need to
+sign in with one of the two Supabase Auth accounts.
 
-## Building for deployment
+## Running the tests
+
+```bash
+npm test
+```
+
+Covers the totals/reference-number math (`src/lib/calc.test.js`) and the
+real `supabase/schema.sql` run against an in-memory Postgres via
+`@electric-sql/pglite` (`supabase/schema.test.js`) — including a test that
+simulates two overlapping saves to confirm neither one erases the other's
+data.
+
+## Deployment
+
+The live app is hosted on **Render** as a static site
+(`amitek-quotation-tool.onrender.com`), building from this repo's `main`
+branch on every push. The database lives in a separate **Supabase**
+project — schema and functions are defined in `supabase/schema.sql` and
+applied by hand through the Supabase SQL Editor (there's no CI step that
+runs migrations automatically, so a schema change needs to be applied to
+the live database manually after merging).
+
+To build locally (e.g. to sanity-check before pushing):
 
 ```bash
 npm run build
-```
-
-This produces a `dist/` folder containing plain HTML/CSS/JS — that folder is
-the entire app. It can be hosted absolutely anywhere that can serve static
-files: GitHub Pages, Netlify, Vercel, Cloudflare Pages, or your own server.
-There is no backend/database to set up.
-
-You can sanity-check the build locally before deploying:
-
-```bash
 npm run preview
 ```
 
@@ -182,115 +198,30 @@ bar) has four tabs:
 
 ---
 
-## Important: your real pricing data lives in the source code
+## This repo is public — what that does and doesn't expose
 
-`src/lib/constants.js` has your actual Systems seeded in it — real system
-names, HSN codes, rates, and coverage figures pulled from your existing
-quotations (and the default letterhead/bank/terms text lives in
-`src/lib/settings.js`). That's convenient (the tool is useful from the
-moment it's deployed, nothing to re-enter), but it also means **anyone who
-can read the source code can read your pricing structure** — regardless of
-whether the deployed site itself is password-protected, since it's plain
-JavaScript that ships to the browser either way. Note that this seed data
-is only the *starting point*: once the app is running, edits made in
-**Manage Systems** and **Settings** are saved to that browser's
-`localStorage`, not back into the source code.
+GitHub Pages and Render's free static-site hosting both require the source
+repo to be public, which is why this one is. The actual business data
+(Systems, rates, quotation history) is **not** in the repo — it lives in
+Supabase, gated by login + row-level security, so making the repo public
+didn't expose it. `src/lib/constants.js` used to have the real rate card
+hardcoded as first-run seed data for the old localStorage version; that's
+been stripped out (it's unused now that Supabase seeds each division
+empty) specifically because this repo is public.
 
-Keep this in mind when picking where the *code* lives (see below) — it's a
-separate question from where the *site* is hosted.
+What *is* visible to anyone who finds the repo: the app's source code, and
+non-sensitive identity fields like the company's GSTIN/address (the same
+ones printed on every quotation). Access to the actual app still requires
+signing in — the two accounts are managed from the Supabase dashboard
+(Authentication → Users), not from this repo.
 
----
-
-## Hosting options
-
-### Option A — GitHub Pages (free, but the repo must be public)
-
-GitHub's free tier only serves Pages sites from **public** repositories —
-private Pages needs a paid GitHub Pro or Team plan. A public repo means
-anyone can read `src/lib/constants.js`, seed data included.
-
-This repo already includes `.github/workflows/deploy-pages.yml`, which
-builds and deploys automatically on every push to `main`.
-
-1. Create a new **public** repo on GitHub and push this project to it:
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git branch -M main
-   git remote add origin https://github.com/<you>/<repo>.git
-   git push -u origin main
-   ```
-2. In the repo, go to **Settings → Pages** and set **Source** to
-   **GitHub Actions**.
-3. Push again (or re-run the workflow from the **Actions** tab) — your site
-   will be live at `https://<you>.github.io/<repo>/`.
-
-Only use this path if you're comfortable with the seed data (or whatever
-Systems you add) being publicly visible in the repo — or if you plan to
-strip the real numbers out of `SEED_SF()` / `SEED_WP()` first and re-enter
-them by hand once it's live (they'd then only exist in your browser's
-`localStorage`, never in the repo).
-
-### Option B — Free *and* private: Cloudflare Pages + Cloudflare Access
-
-This is the option that actually satisfies both "free" and "private":
-
-1. Keep your GitHub repo **private** (private repos are free and unlimited
-   on GitHub — this restriction is specific to GitHub *Pages*, not GitHub
-   itself).
-2. Create a free [Cloudflare](https://pages.cloudflare.com/) account, and
-   connect Cloudflare Pages to that private repo. Build command:
-   `npm run build`; output directory: `dist`.
-3. In the Cloudflare dashboard, set up **Cloudflare Access** (part of their
-   Zero Trust product, free for up to 50 users) in front of the Pages
-   domain. Visitors are asked to verify their email before the site loads
-   at all — so even the compiled JavaScript (and its embedded seed data)
-   is never reachable without authenticating first.
-
-### Option C — Netlify or Vercel from a private repo
-
-Both can build and deploy directly from a **private** GitHub repo on their
-free tiers (that restriction doesn't apply — only their built-in
-password-protection features are now mostly paid add-ons). Practically,
-that means: your source stays private, but the deployed URL itself is
-reachable by anyone who has it, unless you pair it with something like
-Cloudflare Access in front, or your own simple auth.
-
-### Option D — Your own server
-
-The most straightforward option for privacy, since there's no third-party
-policy to design around — you control access entirely.
-
-```bash
-npm run build
-scp -r dist/* you@yourserver:/var/www/amitek-quotation-tool/
-```
-
-Then serve it with any web server. Example Nginx site config:
-
-```nginx
-server {
-    listen 80;
-    server_name quotes.yourdomain.com;
-    root /var/www/amitek-quotation-tool;
-    index index.html;
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-}
-```
-
-For access control, use whatever you already have available: put it behind
-your office VPN, restrict the server firewall to known IPs, add HTTP basic
-auth in the Nginx/Apache config, or put a simple login page in front of it.
-
-For a quick local-network test without setting up a proper web server at
-all, `dist/` can even be served with a one-liner:
-
-```bash
-npx serve dist
-```
+Two things worth knowing if you ever want to lock this down further:
+- Making the repo **private** would likely require reconnecting it to both
+  Render and GitHub Pages (both needed "public" to fetch it the first
+  time) — ask if you want to go down that path.
+- **Supabase → Authentication → Settings → "Allow new users to sign up"**
+  should stay **off**, so no one else can create their own account even if
+  they find the live URL.
 
 ---
 
@@ -307,11 +238,12 @@ npx serve dist
 │   │   ├── columns.js              #   the column model (default columns, custom columns)
 │   │   ├── model.js                #   blank/reconciled quotations & line items, migration
 │   │   ├── calc.js                 #   totals math (discount, extra charges, GST)
-│   │   ├── storage.js              #   localStorage load/save, backup export/import
+│   │   ├── storage.js              #   Supabase load/save (per-record), backup export/import
+│   │   ├── supabaseClient.js       #   configured Supabase client
 │   │   ├── pdf.js                  #   the Download PDF generator (html2canvas + jsPDF)
 │   │   └── ids.js                  #   small id/date helpers
 │   └── components/
-│       ├── DivisionPicker.jsx, TopNav.jsx
+│       ├── LoginScreen.jsx, DivisionPicker.jsx, TopNav.jsx
 │       ├── QuotationBuilder.jsx, QuotationHistory.jsx
 │       ├── admin/AdminPanel.jsx    #   Manage Systems tab
 │       ├── settings/SettingsPanel.jsx   # Settings tab (4 sub-tabs)
@@ -321,9 +253,11 @@ npx serve dist
 │       │   │   ShippingDeliveryBlock, SignatureBlock, SystemPicker,
 │       │   │   QuotationDocument (assembles the above)
 │       └── ui/atoms.jsx            #   shared small building blocks (inputs, buttons, logo)
+├── supabase/
+│   ├── schema.sql                  # tables, RLS policies, per-record save functions
+│   └── schema.test.js              # runs schema.sql against real Postgres (PGlite)
 ├── index.html
-├── vite.config.js
-└── .github/workflows/deploy-pages.yml
+└── vite.config.js
 ```
 
 A separate single-file version of this same tool also runs as a Claude

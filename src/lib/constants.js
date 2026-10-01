@@ -105,144 +105,16 @@ export const CATEGORIES = {
 
 export const mkScope = (item, description, remark = '', process = '') => ({ id: uid('sc'), item, description, remark, process });
 
-export const SEED_SF = () => [
-  {
-    id: uid('sys'), division: 'sf', category: 'Nano Topping System', name: 'AMITEK Nano Topping For Walls (L)', hsnCode: '', unit: 'Sq.Ft',
-    pricingMode: 'simple', applicationArea: 'Plaster Walls', defaultRate: 170,
-    scopeRows: [
-      mkScope('Surface Preparation', 'Mechanical grinding / cleaning of existing substrate; removal of laitance, dust and loose material.', 'Compulsory'),
-      mkScope('AMITEK Primer', 'Supply & application of compatible primer over prepared substrate. Zero mm thickness.'),
-      mkScope('AMITEK Wall Base / Screed with color name', 'Supply & application of Nano Topping wall decorative base layer as per approved shade and system specification. 1 mm depending upon site condition.'),
-      mkScope('AMITEK Top Coat with texture finish as per client choice along with color name', 'Application of required top coat with texture finish to achieve seamless decorative appearance. 1 mm approx.'),
-      mkScope('AMITEK Sealer Coat using AMITEK single Component.', 'Supply & application of protective sealer coat suitable for the selected Nano Topping Wall finish. Will use AMITEK single Component.'),
-      mkScope('Edge / Detail Work', 'Corners, edges, transitions and minor detailing required for complete finish.', 'If Required'),
-    ],
-  },
-  {
-    id: uid('sys'), division: 'sf', category: 'Nano Topping System', name: 'AMITEK Nano Topping for Floors', hsnCode: '', unit: 'Sq.Ft',
-    pricingMode: 'simple', applicationArea: 'Fixed Tiles, Stone Floorings', defaultRate: 290,
-    scopeRows: [
-      mkScope('AMITEK Nano Topping Primer', 'Water based Primer for Surface Preparation Tiles or fixed stone is mandatory before application of nano topping.', 'Compulsory'),
-      mkScope('AMITEK Nano Topping Base Coat 1', 'Is a combination of 3 component polymer base lotion and polymer based powder and organic pigments'),
-      mkScope('AMITEK Nano Topping Base Coat 2', 'Is a combination of 3 component polymer base lotion and polymer based powder and organic pigments'),
-      mkScope('AMITEK Nano Topping Top Coat 1', 'Is a combination of 3 component polymer base lotion and polymer based powder and organic pigments'),
-      mkScope('AMITEK Nano Topping Top Coat 2', 'Is a combination of 3 component polymer base lotion and polymer based powder and organic pigments'),
-      mkScope('AMITEK 2 Component Sealer', 'It is a 2 Component PU based Sealer for better adhesion'),
-    ],
-  },
-  {
-    id: uid('sys'), division: 'sf', category: 'Lime System', name: 'AMITEK Modified Lime for Smooth / Textured Finish Walls', hsnCode: '', unit: 'Sq.Ft',
-    pricingMode: 'simple', applicationArea: 'Plaster Walls', defaultRate: 80,
-    scopeRows: [
-      mkScope('Surface Preparation', 'Mechanical grinding / cleaning of existing substrate; removal of laitance, dust and loose material.', 'If Required'),
-      mkScope('AMITEK Lime Primer', 'Supply & application of compatible primer over prepared substrate. Zero mm thickness.', 'If Required'),
-      mkScope('AMITEK Lime Wall Base / Screed with color name', 'Supply & application of Lime wall decorative base layer as per approved shade and system specification. 1 mm to 2 mm depending upon site condition.', '-'),
-      mkScope('AMITEK Lime Top Coat with texture finish as per client choice along with color name', 'Application of required top coat with texture finish to achieve seamless decorative appearance. 1 to 2 mm approx.', '-'),
-      mkScope('AMITEK Sealer Coat using AMITEK single Component.', 'Supply & application of protective sealer coat suitable for the selected Lime Wall finish. Will use AMITEK single Component.', 'If Required'),
-      mkScope('Edge / Detail Work', 'Corners, edges, transitions and minor detailing required for complete finish.', 'If Required'),
-    ],
-  },
-  {
-    id: uid('sys'), division: 'sf', category: 'Lime System', name: 'AMITEK Modified Lime Plaster', hsnCode: '', unit: 'Sq.Ft',
-    pricingMode: 'simple', applicationArea: 'Bricks Walls', defaultRate: 190,
-    scopeRows: [
-      mkScope('Surface Preparation', 'Mechanical grinding / cleaning of existing substrate; removal of laitance, dust and loose material.', 'Compulsory'),
-      mkScope('AMITEK Lime Primer', 'Supply & application of compatible primer over prepared substrate. Zero mm thickness.'),
-      mkScope('AMITEK Lime Wall Base 1 / Screed', 'Supply & application of Lime wall strengthen base layer 1 mm to 2 mm depending upon site condition.'),
-      mkScope('AMITEK Lime Wall Base 2 / Screed', 'Supply & application of Lime wall strengthen base layer 1 mm to 2 mm depending upon site condition.'),
-      mkScope('AMITEK Lime Top Coat 1 with texture finish', 'Supply & application of Lime wall strengthen Top layer 1 mm to 2 mm depending upon site condition.'),
-      mkScope('AMITEK Lime Top Coat 2 with texture finish', 'Supply & application of Lime wall strengthen Top layer 1 mm to 2 mm depending upon site condition.'),
-      mkScope('Edge / Detail Work', 'Corners, edges, transitions and minor detailing required for complete finish.'),
-    ],
-  },
-  {
-    id: uid('sys'), division: 'sf', category: 'Lime System', name: 'AMITEK Modified Lime Floors With Sealer', hsnCode: '', unit: 'Sq.Ft',
-    pricingMode: 'simple', applicationArea: 'Floor', defaultRate: 180,
-    scopeRows: [
-      mkScope('Surface Preparation', 'Mechanical grinding / cleaning of existing substrate; removal of laitance, dust and loose material.', 'Compulsory'),
-      mkScope('AMITEK Lime Primer', 'Supply & application of compatible primer over prepared substrate. Zero mm thickness.'),
-      mkScope('AMITEK Lime Floor Base / Screed with color name', 'Supply & application of Lime Floor decorative base layer as per approved shade and system specification. 1 mm to 2 mm depending upon site condition.'),
-      mkScope('AMITEK Lime Top Coat with texture finish as per client choice along with color name', 'Application of required top coat with texture finish to achieve seamless decorative appearance. 2 to 3 mm approx.'),
-      mkScope('AMITEK Sealer Coat using PU matt 2 Component', 'Supply & application of protective sealer coat suitable for the selected Lime Floor finish. Will use PU mat 2 Component.'),
-      mkScope('Edge / Detail Work', 'Corners, edges, transitions and minor detailing required for complete finish.'),
-    ],
-  },
-  {
-    id: uid('sys'), division: 'sf', category: 'Lime System', name: 'AMITEK Modified Lime Walls With Sealer', hsnCode: '', unit: 'Sq.Ft',
-    pricingMode: 'simple', applicationArea: 'Walls', defaultRate: 100,
-    scopeRows: [
-      mkScope('Surface Preparation', 'Mechanical grinding / cleaning of existing substrate; removal of laitance, dust and loose material.', 'Compulsory'),
-      mkScope('AMITEK Lime Primer', 'Supply & application of compatible primer over prepared substrate. Zero mm thickness.'),
-      mkScope('AMITEK Lime Wall Base / Screed with color name', 'Supply & application of Lime Floor decorative base layer as per approved shade and system specification. 1 mm to 2 mm depending upon site condition.'),
-      mkScope('AMITEK Lime Top Coat with texture finish as per client choice along with color name', 'Application of required top coat with texture finish to achieve seamless decorative appearance. 2 to 3 mm approx.'),
-      mkScope('AMITEK Sealer Coat using PU matt 2 Component', 'Supply & application of protective sealer coat suitable for the selected Lime Walls finish. Will use PU mat 2 Component.'),
-      mkScope('Edge / Detail Work', 'Corners, edges, transitions and minor detailing required for complete finish.'),
-    ],
-  },
-  {
-    id: uid('sys'), division: 'sf', category: 'Araish Finish System', name: 'AMITEK Modified Lime Walls Araish Finish', hsnCode: '', unit: 'Sq.Ft',
-    pricingMode: 'simple', applicationArea: 'Walls', defaultRate: 100,
-    scopeRows: [
-      mkScope('Surface Preparation', 'Mechanical grinding / cleaning of existing substrate; removal of laitance, dust and loose material.', 'Compulsory'),
-      mkScope('AMITEK Lime Primer', 'Supply & application of compatible primer over prepared substrate. Zero mm thickness.'),
-      mkScope('AMITEK Lime Wall Base / Screed with color name', 'Supply & application of Lime Wall decorative base layer as per approved shade and system specification. 1 mm to 2 mm depending upon site condition.'),
-      mkScope('AMITEK Lime Top Coat with smooth finish as per client choice along with color name', 'Application of required top coat with smooth finish to achieve seamless decorative appearance. 1 to 2 mm approx.'),
-      mkScope('AMITEK Polishing with Buffing', 'Protective Preparation with machinery or stone'),
-      mkScope('Edge / Detail Work', 'Corners, edges, transitions and minor detailing required for complete finish.'),
-    ],
-  },
-];
+// Real system names/rates/HSN codes used to be hardcoded here as the
+// first-run seed for a fresh browser's localStorage. Since the move to
+// Supabase (each division's row in `division_data` is seeded empty by
+// supabase/schema.sql instead — see src/lib/storage.js), nothing in the
+// app imports these two functions any more: Systems now come entirely
+// from the database, managed from the Manage Systems tab. Left as
+// no-op stubs (rather than deleted outright) only so a stray import
+// doesn't crash; the real rate card used to live here in plain text in
+// this now-public repo, which is why it was stripped out rather than
+// just left in place as unused.
+export const SEED_SF = () => [];
 
-export const SEED_WP = () => [
-  {
-    id: uid('sys'), division: 'wp', category: 'Nano Pore System (Exposed / System-1)', name: 'AMITEK Waterproofing System-1 (Sun-Exposed, No Tile)', hsnCode: '', unit: 'Sq.Ft',
-    pricingMode: 'simple', applicationArea: 'Terrace, Sun-exposed slabs / Slope Chajja', defaultRate: 55,
-    scopeRows: [
-      mkScope('AMITEK HWR 22 Combined with AMITEK CMP 78', 'Organosilane-based waterproofing agent that seals surface nanopores and fine cracks, penetrating up to 4mm deep for a hydrophobic barrier. Applied over CMP 78 bonding primer.', 'Compulsory', 'Mix 1 part HWR 22, 2 parts CMP 78, and 20 parts water until fully blended, then apply directly to the prepared surface.'),
-      mkScope('AMITEK Crack Filler', 'Specialized material for sealing joints and filling V-shaped cut cracks before applying protective damp-proofing coatings.', '', 'Remove dust/oil/grease, cut cracks into a V-shape, pack filler firmly, allow to dry fully before priming/topcoats.'),
-      mkScope('AMITEK Smart Duo Shield Dampproof Elastomeric Film Forming System', 'Acrylic-binder, polyester-fibre reinforced single-component system forming a seamless waterproofing barrier; also works as a roof cooling system, lowering surface temperature by 10-12°C.', '', 'Apply one primer coat, then 3 coats embedding 60 GSM reinforcing fabric, alternating horizontal/vertical passes.'),
-    ],
-  },
-  {
-    id: uid('sys'), division: 'wp', category: 'Under-Tile System (System-2)', name: 'AMITEK Waterproofing System-2 (Under-Tile / OHT)', hsnCode: '', unit: 'Sq.Ft',
-    pricingMode: 'simple', applicationArea: 'Bathrooms, Balconies, Passages, OHT, Utility areas', defaultRate: 57.5,
-    scopeRows: [
-      mkScope('AMITEK HWR 22 Combined with AMITEK CMP 78', 'Organosilane-based waterproofing agent that seals surface nanopores and fine cracks, penetrating up to 4mm deep. Applied over CMP 78 bonding primer.', 'Compulsory', 'Mix 1 part HWR 22, 2 parts CMP 78, and 20 parts water until fully blended, then apply to the prepared surface.'),
-      mkScope('AMITEK Crack Filler', 'Specialized material for sealing joints and filling V-shaped cut cracks before applying protective coatings.', '', 'Remove dust/oil/grease, cut cracks into a V-shape, pack filler firmly, allow to dry fully.'),
-      mkScope('HMC 501 Film Forming Cementitious Water Proofing', 'Acrylic-based emulsion mixed with cement forming a cross-linked elastomeric membrane, elongation capacity up to 250%.', '', 'Apply Primer CMP 78, mix 1L HMC 501 with 750g cement + up to 200ml water, apply first coat + fabric, dry 6 hrs, apply 2nd coat perpendicular. Cure 2-3 days.'),
-    ],
-  },
-  {
-    id: uid('sys'), division: 'wp', category: 'Swimming Pool / PU System (System-3)', name: 'AMITEK Waterproofing System-3 (Swimming Pool / PU)', hsnCode: '', unit: 'Sq.Ft',
-    pricingMode: 'simple', applicationArea: 'Swimming Pool floor and wall', defaultRate: 195,
-    scopeRows: [
-      mkScope('AMITEK PU 270 / 275 (720) (I)', 'Solvent-based, one-component polyurethane membrane with built-in root resistance, forming a highly permanent elastic waterproof barrier.', 'Compulsory', 'Liquid-applied, cold-curing membrane that cures via reaction with ambient moisture.'),
-      mkScope('Amitek Cipoxy Primer', 'Two-component, epoxy resin based primer suitable for damp concrete, excellent primer for PU/Polyurea/Hybrid Polyurea systems.', '', 'Mix resin and hardener per spec, apply directly to damp concrete before PU/Polyurea topcoats.'),
-      mkScope('AMITEK Fabric and Geo Textile 60 GSM', 'Lightweight reinforcing fabric for liquid-applied membranes, boosting tensile strength, tear resistance and crack-bridging.', 'If Required', ''),
-    ],
-  },
-  {
-    id: uid('sys'), division: 'wp', category: 'Material / Per-Kg Products', name: 'AMITEK HWR-22', hsnCode: '29319090', unit: 'Kg',
-    pricingMode: 'material', coveragePerKg: 385.96, defaultPricePerKg: 1575.89,
-    description: 'Professional-grade organosilane-based waterproofing agent that seals surface nanopores and fine cracks. Penetrates up to 4mm deep, creating a long-lasting hydrophobic, water-repellent barrier. Applied over CMP 78 bonding primer.',
-    process: 'Mix 1 part HWR 22, 2 parts CMP 78, and 20 parts water until fully blended, then apply to the prepared surface.',
-  },
-  {
-    id: uid('sys'), division: 'wp', category: 'Material / Per-Kg Products', name: 'AMITEK CMP-78', hsnCode: '38244010', unit: 'Kg',
-    pricingMode: 'material', coveragePerKg: 215.69, defaultPricePerKg: 290.77,
-    description: 'Bonding primer and porosity filler used with HWR 22.',
-    process: 'Used as the primer coat prior to HWR 22 application.',
-  },
-  {
-    id: uid('sys'), division: 'wp', category: 'Material / Per-Kg Products', name: 'AMITEK HMC-501', hsnCode: '38244010', unit: 'Kg',
-    pricingMode: 'material', coveragePerKg: 14.09, defaultPricePerKg: 257.35,
-    description: 'Film-forming cementitious waterproofing: an acrylic-based emulsion mixed with cement to create a cross-linked elastomeric membrane offering high stretchability up to 250%.',
-    process: 'Apply Primer CMP 78, mix 1L HMC 501 with 750g cement + up to 200ml water, apply first coat + fabric, dry 6 hrs, apply 2nd coat perpendicular. Cure 2-3 days.',
-  },
-  {
-    id: uid('sys'), division: 'wp', category: 'Material / Per-Kg Products', name: 'AMITEK Smart Duo Shield Dampproof', hsnCode: '32141000', unit: 'Kg',
-    pricingMode: 'material', coveragePerKg: 8, defaultPricePerKg: 186.85,
-    description: 'Single-component acrylic binder / polyester fibre reinforced elastomeric film-forming waterproofing barrier; also functions as a roof-cooling system, lowering surface temperature 10-12°C.',
-    process: 'One primer coat, then 3 coats embedding 60 GSM reinforcing fabric, alternating horizontal/vertical passes.',
-  },
-];
+export const SEED_WP = () => [];
