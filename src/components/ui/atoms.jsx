@@ -71,9 +71,19 @@ export function Btn({ children, onClick, variant = 'primary', accentClasses, cla
  * and form field in this app is built from. */
 export function EF({ editable, value, onChange, className = '', placeholder = '', multiline = false, accent = 'slate', rows = 2 }) {
   if (!editable) {
+    // Block, not inline: callers (ClientCard, the Applicator card,
+    // ShippingDeliveryBlock) stack several of these as separate lines
+    // via a `space-y-1` wrapper, which only adds spacing between
+    // block-level siblings. A `<span>` here just flows inline instead,
+    // so in the read-only view (History, the print twin, Download PDF)
+    // every field ran together on one line — e.g. "Sample Client Pvt.
+    // Ltd.Mr. Sample Contact" instead of two lines. A couple of callers
+    // (SignatureBlock) had already worked around this by adding `block`
+    // to their own className; fixing it here means nobody else needs to
+    // remember to.
     return multiline
       ? <div className={`whitespace-pre-wrap ${className}`}>{value || ''}</div>
-      : <span className={className}>{value || ''}</span>;
+      : <div className={className}>{value || ''}</div>;
   }
   return multiline
     ? <TextArea value={value} onChange={onChange} placeholder={placeholder} accent={accent} className={className} rows={rows} />
