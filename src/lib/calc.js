@@ -70,7 +70,16 @@ export function computeTotals(quotation) {
     ? { mode: 'igst', igstPercent: num(gstPercent), igst: gst, cgstPercent: 0, cgst: 0, sgstPercent: 0, sgst: 0 }
     : { mode: 'cgst_sgst', cgstPercent: halfPercent, cgst: gst / 2, sgstPercent: halfPercent, sgst: gst / 2, igstPercent: 0, igst: 0 };
 
-  return { subtotal, discountAmount: clampedDiscount, extraChargesTotal, taxableBase, gst, grand, gstBreakup };
+  // Advance payments already received from the client (optional; only
+  // counted while the "Show advance" switch is on). Purely informational
+  // — it never changes GST or the Grand Total, only how much is still due.
+  const advance = quotation.advance || {};
+  const advanceTotal = advance.enabled
+    ? (advance.payments || []).reduce((s, p) => s + Math.max(num(p.amount), 0), 0)
+    : 0;
+  const balance = grand - advanceTotal;
+
+  return { subtotal, discountAmount: clampedDiscount, extraChargesTotal, taxableBase, gst, grand, gstBreakup, advanceTotal, balance };
 }
 
 export function fmt(n) {

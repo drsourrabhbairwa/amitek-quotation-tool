@@ -75,7 +75,7 @@ export function QuotationHistory({ div, quotations, onEdit, onDelete, onConvertT
       </div>
       <div className="space-y-2">
         {filtered.map(item => {
-          const { grand } = computeTotals(item);
+          const { grand, advanceTotal, balance } = computeTotals(item);
           return (
             <div key={item.id} className="bg-white border border-slate-200 rounded-lg p-3.5 flex items-center justify-between gap-3">
               <button className="text-left min-w-0 flex-1" onClick={() => setViewing(item)}>
@@ -85,7 +85,7 @@ export function QuotationHistory({ div, quotations, onEdit, onDelete, onConvertT
                   <span className="text-xs text-slate-400">{item.date}</span>
                 </div>
                 <div className="font-medium text-slate-800 text-sm truncate mt-0.5">{item.client?.name || 'Untitled client'}</div>
-                <div className={`text-sm font-semibold ${div.text} mt-0.5`}>₹ {fmt(grand)}</div>
+                <div className={`text-sm font-semibold ${div.text} mt-0.5`}>₹ {fmt(grand)}{advanceTotal > 0 && <span className="text-xs font-normal text-slate-500"> · Advance ₹ {fmt(advanceTotal)} · Balance ₹ {fmt(balance)}</span>}</div>
               </button>
               <div className="flex items-center gap-1 shrink-0">
                 <button onClick={() => onEdit(item)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded"><Pencil size={15} /></button>

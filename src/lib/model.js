@@ -70,6 +70,7 @@ export function blankQuotation(div, settings) {
     gstPercent: s.tax.defaultGstPercent,
     discount: { ...s.tax.defaultDiscount },
     extraCharges: [],
+    advance: { enabled: false, payments: [] },
     termsTemplateId: template.id,
     termsBoxes: (template.boxes || []).map(t => ({ ...t, id: uid('box') })),
     signatory: { ...signatory },
@@ -101,6 +102,10 @@ export function convertToProformaInvoice(quotation) {
     lineItems: (quotation.lineItems || []).map(li => ({ ...li, id: uid('li') })),
     termsBoxes: (quotation.termsBoxes || []).map(t => ({ ...t, id: uid('box') })),
     extraCharges: (quotation.extraCharges || []).map(c => ({ ...c, id: uid('ec') })),
+    advance: {
+      enabled: false, payments: [], ...(quotation.advance || {}),
+      payments: ((quotation.advance && quotation.advance.payments) || []).map(p => ({ ...p, id: uid('adv') })),
+    },
     createdAt: Date.now(), updatedAt: Date.now(),
   };
 }
@@ -128,6 +133,7 @@ export function reconcileQuotation(q, divKey, settings) {
     gstPercent: q.gstPercent ?? s.tax.defaultGstPercent,
     discount: q.discount || { type: 'percent', value: 0 },
     extraCharges: q.extraCharges || [],
+    advance: { enabled: false, payments: [], ...(q.advance || {}) },
     termsTemplateId: q.termsTemplateId ?? template.id,
     termsBoxes: q.termsBoxes || (template.boxes || []).map(t => ({ ...t, id: uid('box') })),
     signatory: q.signatory || { ...signatory },

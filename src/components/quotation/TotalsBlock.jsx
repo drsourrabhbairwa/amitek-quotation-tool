@@ -5,7 +5,7 @@ import { uid } from '../../lib/ids';
 import { computeTotals, fmt } from '../../lib/calc';
 
 export function TotalsBlock({ quotation, editable, onChange, chargePresets }) {
-  const { subtotal, discountAmount, gst, grand, gstBreakup } = computeTotals(quotation);
+  const { subtotal, discountAmount, gst, grand, gstBreakup, advanceTotal, balance } = computeTotals(quotation);
   const isPI = quotation.docType === 'proforma';
   const discount = quotation.discount || { type: 'percent', value: 0 };
   const extraCharges = quotation.extraCharges || [];
@@ -15,6 +15,15 @@ export function TotalsBlock({ quotation, editable, onChange, chargePresets }) {
   const addCharge = (preset) => setExtraCharges([...extraCharges, { id: uid('ec'), label: preset?.label || 'Charge', amount: preset?.amount || 0, taxable: true }]);
   const updateCharge = (id, patch) => setExtraCharges(extraCharges.map(c => c.id === id ? { ...c, ...patch } : c));
   const removeCharge = (id) => setExtraCharges(extraCharges.filter(c => c.id !== id));
+
+  const advance = quotation.advance || { enabled: false, payments: [] };
+  const payments = advance.payments || [];
+  const setAdvance = (patch) => onChange({ advance: { ...advance, ...patch } });
+  const addPayment = () => setAdvance({ enabled: true, payments: [...payments, { id: uid('adv'), date: new Date().toISOString().slice(0, 10), amount: '', mode: '', ref: '' }] });
+  const updatePayment = (id, patch) => setAdvance({ payments: payments.map(p => p.id === id ? { ...p, ...patch } : p) });
+  const removePayment = (id) => setAdvance({ payments: payments.filter(p => p.id !== id) });
+  const fmtDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d.split('-').reverse().join('-') : (d || '');
+  const showAdvance = advance.enabled && (editable || advanceTotal > 0);
 
   const showDiscount = editable || discountAmount > 0;
   const showCharges = editable || extraCharges.length > 0;
@@ -95,6 +104,45 @@ export function TotalsBlock({ quotation, editable, onChange, chargePresets }) {
           </div>
         )}
         <div className="flex justify-between py-1.5 font-bold text-slate-800"><span>Grand Total:</span><span>₹ {fmt(grand)}</span></div>
+
+        {editable && (
+          <label className="no-print flex items-center gap-2 py-1.5 text-xs text-slate-600 cursor-pointer select-none border-t border-slate-100">
+            <input type="checkbox" checked={!!advance.enabled} onChange={e => setAdvance({ enabled: e.target.checked })} className="accent-slate-700" />
+            Show advance payment received
+          </label>
+        )}
+
+        {showAdvance && (
+          <div className="py-1 border-t border-slate-100">
+            <div className="text-slate-500 mb-1">Advance received:</div>
+            {payments.map(p => (
+              <div key={p.id} className="py-0.5">
+                {editable ? (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <input type="date" value={p.date || ''} onChange={e => updatePayment(p.id, { date: e.target.value })} className="text-xs border border-slate-300 rounded px-1 py-0.5" />
+                    <TextInput value={p.mode} onChange={v => updatePayment(p.id, { mode: v })} placeholder="UPI / Cheque / NEFT" className="w-28 !py-0.5 text-xs" />
+                    <TextInput value={p.ref} onChange={v => updatePayment(p.id, { ref: v })} placeholder="Ref / UTR no." className="flex-1 min-w-20 !py-0.5 text-xs" />
+                    <TextInput type="number" value={p.amount} onChange={v => updatePayment(p.id, { amount: v })} placeholder="Amount" className="w-24 !py-0.5 text-xs text-right" />
+                    <button onClick={() => removePayment(p.id)} className="no-print text-slate-300 hover:text-red-600 shrink-0"><X size={13} /></button>
+                  </div>
+                ) : (
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-500 text-xs">{[fmtDate(p.date), p.mode, p.ref].filter(Boolean).join(' · ') || 'Advance'}</span>
+                    <span className="font-medium">₹ {fmt(p.amount)}</span>
+                  </div>
+                )}
+              </div>
+            ))}
+            {editable && (
+              <Btn variant="ghost" onClick={addPayment} className="no-print !px-2 !py-0.5 text-[11px]"><Plus size={11} /> Add advance payment</Btn>
+            )}
+            {editable && advanceTotal > grand && (
+              <div className="no-print text-[11px] text-red-600 mt-1">Advance is more than the Grand Total — please check the amounts.</div>
+            )}
+            <div className="flex justify-between py-1 mt-1 border-t border-slate-100"><span className="text-slate-500">Total advance received:</span><span className="font-medium text-emerald-700">- ₹ {fmt(advanceTotal)}</span></div>
+            <div className="flex justify-between py-1.5 font-bold text-slate-800 border-t border-slate-300"><span>Balance Payable:</span><span>₹ {fmt(balance)}</span></div>
+          </div>
+        )}
       </div>
     </div>
   );
