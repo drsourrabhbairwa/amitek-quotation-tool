@@ -9,7 +9,7 @@ export function TermsBoxes({ boxes, onChange, editable, div, templates, onApplyT
   const add = () => onChange([...boxes, { id: uid('box'), title: 'New Section', content: '' }]);
 
   return (
-    <div className="mt-5 space-y-3 text-xs">
+    <div className="mt-5 space-y-3 print:mt-3 print:space-y-1.5 text-xs">
       {editable && templates && templates.length > 1 && (
         <div className="no-print flex items-center gap-2 mb-2">
           <span className="text-slate-400">Load terms template:</span>

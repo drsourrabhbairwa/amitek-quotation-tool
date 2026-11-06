@@ -30,4 +30,25 @@ describe('TotalsBlock advance section', () => {
     const html = renderToStaticMarkup(<TotalsBlock quotation={q({ enabled: false, payments: [] })} editable onChange={() => {}} />);
     expect(html).toContain('Show advance payment received');
   });
+
+  it('lists non-GST charges in their own group after GST, and GST excludes them', () => {
+    const quo = { ...q(undefined), extraCharges: [
+      { id: 'a', label: 'Transport', amount: 2500, taxable: true },
+      { id: 'b', label: 'Supervision Charges', amount: 5000, taxable: false },
+    ] };
+    const html = renderToStaticMarkup(<TotalsBlock quotation={quo} editable={false} onChange={() => {}} />);
+    expect(html).toContain('Extra charges (GST applicable)');
+    expect(html).toContain('Charges not subject to GST');
+    expect(html.indexOf('Charges not subject to GST')).toBeGreaterThan(html.indexOf('GST @'));
+    expect(html.indexOf('Charges not subject to GST')).toBeLessThan(html.indexOf('Grand Total'));
+    // (10000 + 2500) * 18% = 2250 GST; grand = 12500 + 2250 + 5000 = 19750
+    expect(html).toContain('2250.00');
+    expect(html).toContain('19750.00');
+  });
+  it('offers a GST/No GST choice per charge in the editor', () => {
+    const quo = { ...q(undefined), extraCharges: [{ id: 'a', label: 'Transport', amount: 1, taxable: true }] };
+    const html = renderToStaticMarkup(<TotalsBlock quotation={quo} editable onChange={() => {}} />);
+    expect(html).toContain('No GST');
+    expect(html).toContain('Non-GST charge');
+  });
 });

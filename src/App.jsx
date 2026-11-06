@@ -26,8 +26,15 @@ const PRINT_STYLES = `
      clipping the right-hand ones off. */
   .overflow-x-auto { overflow: visible !important; }
   table { page-break-inside: auto; border-collapse: collapse; width: 100% !important; min-width: 0 !important; table-layout: fixed !important; font-size: 9px !important; }
-  th, td { padding: 3px 4px !important; overflow-wrap: break-word; word-break: break-word; }
-  tr { page-break-inside: avoid; break-inside: avoid; }
+  th, td { padding: 2px 4px !important; line-height: 1.25 !important; overflow-wrap: break-word; word-break: break-word; }
+  /* Let a System (several rows glued together by rowspan cells) flow
+     across pages instead of jumping whole to the next one — that jump
+     left every page ~half empty. Chrome treats a rowspan group as one
+     unbreakable block whenever its <tr>s are marked avoid, so rows stay
+     breakable and each individual cell (never a rowspan one) is kept
+     whole instead, so no line of text is ever cut in half. */
+  tr { page-break-inside: auto; break-inside: auto; }
+  td:not([rowspan]) { break-inside: avoid; page-break-inside: avoid; }
   thead { display: table-header-group; }
   tfoot { display: table-footer-group; }
   .avoid-break { page-break-inside: avoid; break-inside: avoid; }

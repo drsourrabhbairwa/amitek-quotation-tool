@@ -8,9 +8,9 @@ const th = "border border-slate-300 bg-slate-100 px-2 py-1.5 text-[11px] font-se
 const td = "border border-slate-300 px-2 py-1.5 text-[11.5px] text-slate-700 align-top";
 
 const WIDTH_BY_KIND = {
-  sno: 34, name: 180, scope: 190, process: 170, applicationArea: 130, remark: 90,
-  rate: 60, color: 80, area: 60, discountRate: 70, coverage: 70,
-  consumption: 80, pricePerKg: 70, total: 80, custom: 120,
+  sno: 30, name: 140, scope: 330, process: 170, applicationArea: 95, remark: 70,
+  rate: 50, color: 65, area: 55, discountRate: 60, coverage: 65,
+  consumption: 70, pricePerKg: 60, total: 75, custom: 100,
 };
 const colWidth = (col) => ({ minWidth: WIDTH_BY_KIND[col.kind] || 90 });
 const ACTIONS_WEIGHT = 40;
