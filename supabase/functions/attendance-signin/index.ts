@@ -67,12 +67,17 @@ Deno.serve(async (req) => {
     if (!r.ok || !r.data) return reply({ error: r.error || 'This link has expired. Open the Quotation Tool again from the attendance app.' }, 403);
     const { email, name, id, link } = r.data;
 
-    // Never take over a login someone made directly in the Quotation Tool: those stay with their own password.
+    // Someone who already has their own Quotation Tool password (same email) is simply signed in to that account.
+    // Their login stays a direct one: no access row, and their password keeps working as before.
     const { data: existing } = await admin.from('quotation_access').select('email').eq('email', email).maybeSingle();
     if (!existing) {
       const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
       const direct = (list?.users || []).find((x) => (x.email || '').toLowerCase() === email && x.user_metadata?.source !== 'attendance');
-      if (direct) return reply({ error: 'This email already has its own Quotation Tool password. Sign in with that instead.' }, 409);
+      if (direct) {
+        const { data: gl, error: glErr } = await admin.auth.admin.generateLink({ type: 'magiclink', email });
+        if (glErr) throw glErr;
+        return reply({ token_hash: gl.properties.hashed_token, email });
+      }
     }
 
     const created = await admin.auth.admin.createUser({ email, email_confirm: true, user_metadata: { name, empId: id, source: 'attendance' } });
