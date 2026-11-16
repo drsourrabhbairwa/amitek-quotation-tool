@@ -7,6 +7,7 @@ import { LineItemsTable } from './LineItemsTable';
 import { RowEditForm } from './RowEditForm';
 import { ColumnChooser } from './ColumnChooser';
 import { TotalsBlock } from './TotalsBlock';
+import { HsnSummary } from './HsnSummary';
 import { TermsBoxes } from './TermsBoxes';
 import { BankDetailsBlock } from './BankDetailsBlock';
 import { SignatureBlock } from './SignatureBlock';
@@ -125,6 +126,7 @@ export function QuotationDocument({ div, quotation, editable, onChange, settings
       )}
 
       <TotalsBlock quotation={quotation} editable={editable} onChange={set} chargePresets={settings?.tax?.extraChargePresets} />
+      {quotation.docType === 'proforma' && <HsnSummary quotation={quotation} />}
       <TermsBoxes boxes={quotation.termsBoxes} onChange={(b) => set({ termsBoxes: b })} editable={editable} div={div} templates={settings?.termsTemplates} onApplyTemplate={applyTermsTemplate} />
       <BankDetailsBlock bank={quotation.bank} div={div} />
       <SignatureBlock signatory={quotation.signatory} onChange={(s) => set({ signatory: s })} editable={editable} div={div} signatories={settings?.signatories} signatureImageDataUrl={quotation.signatureImageDataUrl} />

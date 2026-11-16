@@ -2,7 +2,7 @@ import React from 'react';
 import { Plus, X } from 'lucide-react';
 import { TextInput, Btn } from '../ui/atoms';
 import { uid } from '../../lib/ids';
-import { computeTotals, fmt } from '../../lib/calc';
+import { computeTotals, fmt, amountInWords } from '../../lib/calc';
 
 export function TotalsBlock({ quotation, editable, onChange, chargePresets }) {
   const { subtotal, discountAmount, gst, grand, gstBreakup, advanceTotal, balance } = computeTotals(quotation);
@@ -126,6 +126,7 @@ export function TotalsBlock({ quotation, editable, onChange, chargePresets }) {
           </div>
         )}
         <div className="flex justify-between py-1.5 font-bold text-slate-800"><span>Grand Total:</span><span>₹ {fmt(grand)}</span></div>
+        <div className="pb-1.5 text-[11px] italic text-slate-500 text-right leading-snug">{amountInWords(grand)}</div>
 
         {editable && (
           <label className="no-print flex items-center gap-2 py-1.5 text-xs text-slate-600 cursor-pointer select-none border-t border-slate-100">
@@ -163,6 +164,7 @@ export function TotalsBlock({ quotation, editable, onChange, chargePresets }) {
             )}
             <div className="flex justify-between py-1 mt-1 border-t border-slate-100"><span className="text-slate-500">Total advance received:</span><span className="font-medium text-emerald-700">- ₹ {fmt(advanceTotal)}</span></div>
             <div className="flex justify-between py-1.5 font-bold text-slate-800 border-t border-slate-300"><span>Balance Payable:</span><span>₹ {fmt(balance)}</span></div>
+            <div className="pb-1 text-[11px] italic text-slate-500 text-right leading-snug">{amountInWords(balance)}</div>
           </div>
         )}
       </div>
