@@ -203,3 +203,24 @@ describe('sales tracking (status / follow-up)', () => {
     await expect(track('t1', { status: 'maybe' })).rejects.toThrow();
   });
 });
+
+describe('attendance-app access gate (quote_access_ok)', () => {
+  let db;
+  beforeAll(async () => { db = await freshDb(); });
+  afterAll(async () => { await db.close(); });
+  const as = async (email) => { await db.exec(`select set_config('test.jwt', '{"email":"${email}"}', false)`); return (await db.query('select quote_access_ok() as ok')).rows[0].ok; };
+
+  it('a direct Quotation Tool login is always allowed', async () => {
+    expect(await as('owner@amitek.test')).toBe(true);
+  });
+  it('an attendance login is allowed while on and checked within a day', async () => {
+    await db.exec(`insert into quotation_access (email, active, checked_at) values ('staff@amitek.test', true, now())`);
+    expect(await as('Staff@Amitek.test'.toLowerCase())).toBe(true);
+  });
+  it('refused once switched off, or when the last check is over a day old', async () => {
+    await db.exec(`update quotation_access set active = false where email = 'staff@amitek.test'`);
+    expect(await as('staff@amitek.test')).toBe(false);
+    await db.exec(`update quotation_access set active = true, checked_at = now() - interval '25 hours'`);
+    expect(await as('staff@amitek.test')).toBe(false);
+  });
+});

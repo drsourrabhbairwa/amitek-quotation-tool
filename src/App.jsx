@@ -4,6 +4,7 @@ import { DIVISIONS } from './lib/constants';
 import { blankQuotation, convertToProformaInvoice } from './lib/model';
 import { loadDivisionData, saveDivisionData, upsertQuotation, setQuotationTracking, replaceSystems, replaceSettings, deleteQuotationRow, exportBackup, importBackupFile } from './lib/storage';
 import { supabase } from './lib/supabaseClient';
+import { takeHandoffCode, signInFromAttendance, isAttendanceUser, recheckAttendanceAccess } from './lib/attendanceLink';
 import { Btn } from './components/ui/atoms';
 import { DivisionPicker } from './components/DivisionPicker';
 import { LoginScreen } from './components/LoginScreen';
@@ -56,11 +57,34 @@ export default function App() {
   const [session, setSession] = useState(undefined); // undefined = still checking, null = signed out
   const [loadError, setLoadError] = useState(null);
 
+  const [notice, setNotice] = useState(''); // shown on the sign-in screen (e.g. access ended)
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const code = takeHandoffCode();
+    (async () => {
+      if (code) {
+        try { await signInFromAttendance(code); }
+        catch (e) { setNotice(e.message || 'Could not sign you in from the attendance app.'); }
+      }
+      const { data } = await supabase.auth.getSession();
+      setSession(data.session);
+    })();
     const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => setSession(newSession));
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  // A login that came from the attendance app is re-checked now and every 15 minutes.
+  const endAttendanceAccess = useCallback(async (msg) => {
+    setNotice(msg || 'Your Quotation Tool access has ended. Ask the Super Admin in the attendance app.');
+    await supabase.auth.signOut();
+  }, []);
+  useEffect(() => {
+    if (!isAttendanceUser(session)) return;
+    const t = setInterval(() => {
+      recheckAttendanceAccess().then(r => { if (r && r.active === false) endAttendanceAccess(r.error); }).catch(() => {});
+    }, 15 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [session?.user?.id, endAttendanceAccess]);
 
   useEffect(() => {
     if (!session) return;
@@ -68,6 +92,10 @@ export default function App() {
       setLoading(true);
       setLoadError(null);
       try {
+        if (isAttendanceUser(session)) {
+          const r = await recheckAttendanceAccess();
+          if (r && r.active === false) { await endAttendanceAccess(r.error); return; }
+        }
         const [sf, wp] = await Promise.all([loadDivisionData('sf'), loadDivisionData('wp')]);
         setData({ sf, wp });
       } catch (e) {
@@ -230,7 +258,7 @@ export default function App() {
   }
 
   if (!session) {
-    return <LoginScreen />;
+    return <LoginScreen notice={notice} />;
   }
 
   if (loadError) {

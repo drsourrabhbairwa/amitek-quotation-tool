@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabaseClient';
 import { TextInput, Btn } from './ui/atoms';
 import { AmitekLogo } from './ui/atoms';
 
-export function LoginScreen() {
+export function LoginScreen({ notice }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -36,6 +36,7 @@ export function LoginScreen() {
       <form onSubmit={handleSubmit} className="w-full max-w-sm bg-white border border-slate-200 rounded-lg p-6">
         <AmitekLogo w={160} />
         <div className="text-center text-sm text-slate-500 mt-2 mb-5">Sign in to the quotation tool</div>
+        {notice && <div className="mb-4 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-md px-3 py-2" role="status">{notice}</div>}
         <div className="space-y-3">
           <TextInput type="email" value={email} onChange={setEmail} placeholder="Email" />
           <TextInput type="password" value={password} onChange={setPassword} placeholder="Password" />
@@ -45,6 +46,7 @@ export function LoginScreen() {
         <Btn type="submit" disabled={busy} className="w-full justify-center mt-4">
           {busy ? <Loader2 size={14} className="animate-spin" /> : null} Sign in
         </Btn>
+        <p className="text-[11px] text-slate-400 text-center mt-4">Amitek staff: open the Quotation Tool from the attendance app. No separate password is needed.</p>
         <button type="button" onClick={handleForgotPassword} className="block w-full text-center text-xs text-slate-400 hover:text-slate-600 mt-3">
           Forgot password?
         </button>

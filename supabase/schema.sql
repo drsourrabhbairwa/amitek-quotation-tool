@@ -285,6 +285,55 @@ as $$
   where division_key = p_division_key;
 $$;
 
+-- Sign-in from the attendance app (supabase/functions/attendance-signin).
+-- One row per person who came in that way. Only the Edge Function (service
+-- role) writes here; signed-in users cannot read or change it. Logins made
+-- directly in the Quotation Tool have no row and are not affected.
+create table if not exists quotation_access (
+  email       text primary key,
+  emp_id      text,
+  name        text,
+  link        text,
+  active      boolean not null default true,
+  checked_at  timestamptz not null default now(),
+  note        text
+);
+alter table quotation_access enable row level security;
+
+-- True for a direct Quotation Tool login, and for an attendance-app login
+-- whose access is still on and was re-checked within the last day.
+create or replace function quote_access_ok()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select not exists (
+    select 1 from quotation_access a
+    where a.email = lower(coalesce(auth.jwt() ->> 'email', ''))
+      and (not a.active or a.checked_at < now() - interval '1 day')
+  );
+$$;
+
+drop policy if exists "authenticated read/write" on division_data;
+create policy "authenticated read/write" on division_data
+  for all
+  using (auth.role() = 'authenticated' and quote_access_ok())
+  with check (auth.role() = 'authenticated' and quote_access_ok());
+
+drop policy if exists "authenticated read/write" on counters;
+create policy "authenticated read/write" on counters
+  for all
+  using (auth.role() = 'authenticated' and quote_access_ok())
+  with check (auth.role() = 'authenticated' and quote_access_ok());
+
+drop policy if exists "authenticated read/write" on quotation_revisions;
+create policy "authenticated read/write" on quotation_revisions
+  for all
+  using (auth.role() = 'authenticated' and quote_access_ok())
+  with check (auth.role() = 'authenticated' and quote_access_ok());
+
 -- Seed the two divisions' rows so the app's first load finds them
 -- rather than erroring on a missing row.
 insert into division_data (division_key, systems, quotations, settings)
