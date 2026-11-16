@@ -137,7 +137,13 @@ declare
   v_new  jsonb;
   v_rev  int;
   v_user text := coalesce(auth.jwt() ->> 'email', auth.jwt() ->> 'sub', 'unknown');
-  v_meta text[] := array['revision', 'updatedAt', 'updatedBy', 'createdBy', 'savedAt'];
+  v_meta text[] := array['revision', 'updatedAt', 'updatedBy', 'createdBy', 'savedAt',
+                          'status', 'followUpDate', 'statusNote', 'statusLog'];
+  -- Sales-tracking fields (status, follow-up) belong to the server copy:
+  -- they are changed only through set_quotation_tracking, never by an
+  -- editor save that may have been opened before someone changed them.
+  v_track text[] := array['status', 'followUpDate', 'statusNote', 'statusLog'];
+  v_kept  jsonb;
 begin
   -- Row lock first, so two people saving the same division at once are
   -- serialized and each one compares against the other's committed save.
@@ -150,15 +156,18 @@ begin
 
   if v_old is null then
     v_new := p_quotation || jsonb_build_object(
-      'revision', 0, 'createdBy', v_user, 'updatedBy', v_user, 'savedAt', now());
+      'revision', 0, 'createdBy', v_user, 'updatedBy', v_user, 'savedAt', now(),
+      'status', coalesce(p_quotation ->> 'status', 'sent'));
   elsif (v_old - v_meta) is not distinct from (p_quotation - v_meta) then
     return v_old; -- nothing actually changed
   else
     v_rev := coalesce((v_old ->> 'revision')::int, 0);
+    select coalesce(jsonb_object_agg(key, value), '{}'::jsonb) into v_kept
+    from jsonb_each(v_old) where key = any(v_track);
     insert into quotation_revisions (division_key, quotation_id, revision, snapshot, saved_by, saved_at)
     values (p_division_key, p_quotation ->> 'id', v_rev, v_old,
             v_old ->> 'updatedBy', coalesce((v_old ->> 'savedAt')::timestamptz, now()));
-    v_new := p_quotation || jsonb_build_object(
+    v_new := (p_quotation - v_track) || v_kept || jsonb_build_object(
       'revision', v_rev + 1,
       'createdBy', coalesce(v_old -> 'createdBy', to_jsonb(v_old ->> 'updatedBy'), 'null'::jsonb),
       'updatedBy', v_user,
@@ -170,6 +179,57 @@ begin
         select coalesce(jsonb_agg(elem), '[]'::jsonb)
         from jsonb_array_elements(quotations) elem
         where elem ->> 'id' <> (p_quotation ->> 'id')
+      ) || jsonb_build_array(v_new),
+      updated_at = now()
+  where division_key = p_division_key;
+
+  return v_new;
+end;
+$$;
+
+-- Changes only the sales-tracking fields of one quotation (status,
+-- follow-up date, note) without touching its content or Rev number.
+-- Every status change is appended to statusLog with who and when.
+create or replace function set_quotation_tracking(p_division_key text, p_quotation_id text, p_patch jsonb)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_old   jsonb;
+  v_new   jsonb;
+  v_patch jsonb;
+  v_user  text := coalesce(auth.jwt() ->> 'email', auth.jwt() ->> 'sub', 'unknown');
+begin
+  perform 1 from division_data where division_key = p_division_key for update;
+
+  select elem into v_old
+  from division_data d, jsonb_array_elements(d.quotations) elem
+  where d.division_key = p_division_key and elem ->> 'id' = p_quotation_id
+  limit 1;
+  if v_old is null then
+    return null;
+  end if;
+
+  select coalesce(jsonb_object_agg(key, value), '{}'::jsonb) into v_patch
+  from jsonb_each(p_patch) where key in ('status', 'followUpDate', 'statusNote');
+  if v_patch ? 'status' and (v_patch ->> 'status') not in ('draft', 'sent', 'followup', 'won', 'lost') then
+    raise exception 'Unknown status %', v_patch ->> 'status';
+  end if;
+
+  v_new := v_old || v_patch;
+  if (v_new ->> 'status') is distinct from coalesce(v_old ->> 'status', 'sent') then
+    v_new := v_new || jsonb_build_object('statusLog',
+      coalesce(v_old -> 'statusLog', '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+        'status', v_new ->> 'status', 'by', v_user, 'at', now(), 'note', v_new ->> 'statusNote')));
+  end if;
+
+  update division_data
+  set quotations = (
+        select coalesce(jsonb_agg(elem), '[]'::jsonb)
+        from jsonb_array_elements(quotations) elem
+        where elem ->> 'id' <> p_quotation_id
       ) || jsonb_build_array(v_new),
       updated_at = now()
   where division_key = p_division_key;

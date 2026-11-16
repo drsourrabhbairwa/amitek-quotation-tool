@@ -79,7 +79,7 @@ describe('per-record division_data writes (concurrent-save safety)', () => {
     await db.close();
   });
 
-  const META = ['revision', 'updatedAt', 'updatedBy', 'createdBy', 'savedAt'];
+  const META = ['revision', 'updatedAt', 'updatedBy', 'createdBy', 'savedAt', 'status', 'followUpDate', 'statusNote', 'statusLog'];
   const strip = (q) => Object.fromEntries(Object.entries(q).filter(([k]) => !META.includes(k)));
   const quotations = async (divKey) =>
     (await db.query(`select quotations from division_data where division_key = $1`, [divKey])).rows[0].quotations;
@@ -166,5 +166,40 @@ describe('quotation revisions', () => {
   it('deleting a quotation also deletes its revision history', async () => {
     await db.query(`select delete_quotation('sf', 'r1')`);
     expect(await revisions('r1')).toEqual([]);
+  });
+});
+
+describe('sales tracking (status / follow-up)', () => {
+  let db;
+  beforeAll(async () => { db = await freshDb(); });
+  afterAll(async () => { await db.close(); });
+  const upsert = async (q) => (await db.query(`select upsert_quotation('sf', $1::jsonb) as s`, [JSON.stringify(q)])).rows[0].s;
+  const track = async (id, patch) => (await db.query(`select set_quotation_tracking('sf', $1, $2::jsonb) as s`, [id, JSON.stringify(patch)])).rows[0].s;
+
+  it('a new quotation starts as Sent', async () => {
+    expect((await upsert({ id: 't1', total: 1 })).status).toBe('sent');
+  });
+
+  it('status/follow-up changes do not create a revision, and log who changed the status', async () => {
+    const s = await track('t1', { status: 'won', followUpDate: '2026-12-01', statusNote: 'PO received', revision: 9, total: 999 });
+    expect(s.status).toBe('won');
+    expect(s.followUpDate).toBe('2026-12-01');
+    expect(s.total).toBe(1);          // content untouched
+    expect(s.revision).toBe(0);       // no Rev bump
+    expect(s.statusLog).toHaveLength(1);
+    expect(s.statusLog[0]).toMatchObject({ status: 'won', by: 'a@amitek.test', note: 'PO received' });
+    const revs = (await db.query(`select count(*)::int as n from quotation_revisions`)).rows[0].n;
+    expect(revs).toBe(0);
+  });
+
+  it('an editor save opened before the status change cannot undo it', async () => {
+    const s = await upsert({ id: 't1', total: 2, status: 'sent', followUpDate: null });
+    expect(s.revision).toBe(1);
+    expect(s.status).toBe('won');
+    expect(s.followUpDate).toBe('2026-12-01');
+  });
+
+  it('rejects an unknown status', async () => {
+    await expect(track('t1', { status: 'maybe' })).rejects.toThrow();
   });
 });

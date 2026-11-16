@@ -1,9 +1,10 @@
 import React, { useRef } from 'react';
-import { FileText, History, Settings2, ArrowLeft, Download, Upload, SlidersHorizontal, LogOut } from 'lucide-react';
+import { FileText, History, Settings2, ArrowLeft, Download, Upload, SlidersHorizontal, LogOut, LayoutDashboard } from 'lucide-react';
 import { SavingIndicator } from './ui/atoms';
 
 export function TopNav({ div, view, setView, onSwitchDivision, savingState, onExport, onImportFile, onSignOut }) {
   const tabs = [
+    { key: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
     { key: 'new', label: 'New Quotation', Icon: FileText },
     { key: 'history', label: 'History', Icon: History },
     { key: 'admin', label: 'Manage Systems', Icon: Settings2 },

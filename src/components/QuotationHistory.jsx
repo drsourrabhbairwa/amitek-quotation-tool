@@ -5,6 +5,8 @@ import { QuotationDocument } from './quotation/QuotationDocument';
 import { computeTotals, fmt } from '../lib/calc';
 import { downloadQuotationPdf } from '../lib/pdf';
 import { listRevisions } from '../lib/storage';
+import { StatusControl } from './StatusControl';
+import { STATUSES } from '../lib/pipeline';
 
 const who = (email) => (email ? String(email).split('@')[0] : '');
 const when = (iso) => {
@@ -41,8 +43,14 @@ function VersionStrip({ div, current, versions, selected, onSelect }) {
   );
 }
 
-export function QuotationHistory({ div, quotations, onEdit, onDelete, onConvertToPI, settings }) {
-  const [viewing, setViewing] = useState(null);
+export function QuotationHistory({ div, quotations, onEdit, onDelete, onConvertToPI, settings, initialViewId, onTrack }) {
+  const [viewingId, setViewingId] = useState(initialViewId || null);
+  const [orientationOverride, setOrientationOverride] = useState(null);
+  const found = viewingId ? quotations.find(x => x.id === viewingId) : null;
+  // Always the live copy, so a status change made here shows immediately.
+  const viewing = found ? (orientationOverride ? { ...found, pageOrientation: orientationOverride } : found) : null;
+  const setViewing = (item) => { setOrientationOverride(null); setViewingId(item ? item.id : null); };
+  const [statusFilter, setStatusFilter] = useState('all');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [q, setQ] = useState('');
   const [docTypeFilter, setDocTypeFilter] = useState('all'); // 'all' | 'quotation' | 'proforma'
@@ -51,7 +59,6 @@ export function QuotationHistory({ div, quotations, onEdit, onDelete, onConvertT
   const [versions, setVersions] = useState(null); // null | 'loading' | 'error' | [...]
   const [selectedRev, setSelectedRev] = useState(null); // null = current
 
-  const viewingId = viewing?.id;
   useEffect(() => {
     setSelectedRev(null);
     if (!viewingId) { setVersions(null); return; }
@@ -68,6 +75,7 @@ export function QuotationHistory({ div, quotations, onEdit, onDelete, onConvertT
 
   const filtered = [...quotations].reverse()
     .filter(item => docTypeFilter === 'all' || (item.docType || 'quotation') === docTypeFilter)
+    .filter(item => statusFilter === 'all' || (statusFilter === 'open' ? ['sent', 'followup'].includes(item.status || 'sent') && (item.docType || 'quotation') === 'quotation' : (item.status || 'sent') === statusFilter && (item.docType || 'quotation') === 'quotation'))
     .filter(item =>
       (item.client?.name || '').toLowerCase().includes(q.toLowerCase()) || (item.refNo || '').toLowerCase().includes(q.toLowerCase())
     );
@@ -93,7 +101,7 @@ export function QuotationHistory({ div, quotations, onEdit, onDelete, onConvertT
         <div className="no-print flex items-center justify-between mb-4 flex-wrap gap-2">
           <Btn variant="ghost" onClick={() => setViewing(null)}><ArrowLeft size={14} /> Back to history</Btn>
           <div className="flex items-center gap-2">
-            <select value={viewing.pageOrientation || 'portrait'} onChange={e => setViewing({ ...viewing, pageOrientation: e.target.value })} className="border border-slate-300 rounded px-1.5 py-1 text-xs bg-white">
+            <select value={viewing.pageOrientation || 'portrait'} onChange={e => setOrientationOverride(e.target.value)} className="border border-slate-300 rounded px-1.5 py-1 text-xs bg-white">
               <option value="portrait">A4 Portrait</option>
               <option value="landscape">A4 Landscape</option>
             </select>
@@ -111,6 +119,12 @@ export function QuotationHistory({ div, quotations, onEdit, onDelete, onConvertT
             )}
           </div>
         </div>
+        {!oldVersion && (viewing.docType || 'quotation') === 'quotation' && onTrack && (
+          <div className="no-print mb-3 flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-slate-500">Status:</span>
+            <StatusControl quotation={viewing} onTrack={(patch) => onTrack(viewing.id, patch)} />
+          </div>
+        )}
         <VersionStrip div={div} current={viewing} versions={versions} selected={selectedRev} onSelect={setSelectedRev} />
         {oldVersion && (
           <div className="no-print mb-3 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-md px-3 py-2">
@@ -133,6 +147,14 @@ export function QuotationHistory({ div, quotations, onEdit, onDelete, onConvertT
           </button>
         ))}
       </div>
+      <div className="flex items-center gap-1 mb-3 flex-wrap">
+        <span className="text-[11px] text-slate-400 mr-1">Status:</span>
+        {[['all', 'Any'], ['open', 'Open'], ...STATUSES.map(s => [s.key, s.label])].map(([key, label]) => (
+          <button key={key} onClick={() => setStatusFilter(key)} className={`text-[11px] px-2 py-0.5 rounded-full border ${statusFilter === key ? 'bg-slate-800 text-white border-slate-800' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
       <div className="flex items-center gap-2 mb-4">
         <Search size={14} className="text-slate-400" />
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search by client or ref no…" className="text-sm border-b border-slate-200 focus:outline-none focus:border-slate-400 py-1 flex-1 max-w-sm" />
@@ -142,7 +164,8 @@ export function QuotationHistory({ div, quotations, onEdit, onDelete, onConvertT
           const { grand, advanceTotal, balance } = computeTotals(item);
           return (
             <div key={item.id} className="bg-white border border-slate-200 rounded-lg p-3.5 flex items-center justify-between gap-3">
-              <button className="text-left min-w-0 flex-1" onClick={() => setViewing(item)}>
+              <div className="min-w-0 flex-1">
+              <button className="text-left w-full" onClick={() => setViewing(item)}>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-mono text-xs text-slate-400">{item.refNo}</span>
                   {item.docType === 'proforma' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-medium">PI</span>}
@@ -153,6 +176,10 @@ export function QuotationHistory({ div, quotations, onEdit, onDelete, onConvertT
                 <div className="font-medium text-slate-800 text-sm truncate mt-0.5">{item.client?.name || 'Untitled client'}</div>
                 <div className={`text-sm font-semibold ${div.text} mt-0.5`}>₹ {fmt(grand)}{advanceTotal > 0 && <span className="text-xs font-normal text-slate-500"> · Advance ₹ {fmt(advanceTotal)} · Balance ₹ {fmt(balance)}</span>}</div>
               </button>
+              {(item.docType || 'quotation') === 'quotation' && onTrack && (
+                <div className="mt-1.5"><StatusControl quotation={item} onTrack={(patch) => onTrack(item.id, patch)} compact /></div>
+              )}
+              </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button onClick={() => onEdit(item)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded"><Pencil size={15} /></button>
                 {confirmDeleteId === item.id ? (

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
 import { DIVISIONS } from './lib/constants';
 import { blankQuotation, convertToProformaInvoice } from './lib/model';
-import { loadDivisionData, saveDivisionData, upsertQuotation, replaceSystems, replaceSettings, deleteQuotationRow, exportBackup, importBackupFile } from './lib/storage';
+import { loadDivisionData, saveDivisionData, upsertQuotation, setQuotationTracking, replaceSystems, replaceSettings, deleteQuotationRow, exportBackup, importBackupFile } from './lib/storage';
 import { supabase } from './lib/supabaseClient';
 import { Btn } from './components/ui/atoms';
 import { DivisionPicker } from './components/DivisionPicker';
@@ -11,6 +11,7 @@ import { TopNav } from './components/TopNav';
 import { AdminPanel } from './components/admin/AdminPanel';
 import { QuotationBuilder } from './components/QuotationBuilder';
 import { QuotationHistory } from './components/QuotationHistory';
+import { Dashboard } from './components/Dashboard';
 import { SettingsPanel } from './components/settings/SettingsPanel';
 
 const PRINT_STYLES = `
@@ -120,11 +121,46 @@ export default function App() {
     }
   };
 
+  const [focusId, setFocusId] = useState(null); // quotation to open when History mounts
+
+  const replaceLocalQuotation = (divKey, q) => setData(prev => ({
+    ...prev,
+    [divKey]: { ...prev[divKey], quotations: prev[divKey].quotations.map(x => x.id === q.id ? q : x) },
+  }));
+
+  // Status / follow-up change: shown at once, then confirmed by the server
+  // copy (which also logs who changed it). No new revision.
+  const updateTracking = async (id, patch) => {
+    const divKey = division;
+    const before = data[divKey].quotations.find(x => x.id === id);
+    if (!before) return;
+    replaceLocalQuotation(divKey, { ...before, ...patch });
+    try {
+      let stored = null;
+      await withSavingState(async () => { stored = await setQuotationTracking(divKey, id, patch); });
+      if (stored) replaceLocalQuotation(divKey, stored);
+    } catch (e) {
+      replaceLocalQuotation(divKey, before);
+      throw new Error(/set_quotation_tracking|function/i.test(e.message)
+        ? 'Status tracking needs the latest database update (the .sql file) to be run once in Supabase.'
+        : "Couldn't update the status — check your connection and try again.");
+    }
+  };
+
   const saveQuotation = async (quotation) => {
     let saved = quotation;
     await withSavingState(async () => { saved = await upsertQuotation(division, quotation); });
+    // A Proforma Invoice raised from an open quotation means that quotation was won.
+    if (saved.docType === 'proforma' && saved.convertedFromId) {
+      const src = data[division].quotations.find(x => x.id === saved.convertedFromId);
+      if (src && ['sent', 'followup', undefined, null, ''].includes(src.status)) {
+        updateTracking(src.id, { status: 'won', statusNote: `PI ${saved.refNo || ''}`.trim() }).catch(() => {});
+      }
+    }
     return saved;
   };
+
+  const openQuotation = (q) => { setFocusId(q.id); setView('history'); };
 
   const pickDivision = (key) => {
     setDivision(key);
@@ -245,8 +281,14 @@ export default function App() {
           onSaved={() => setView('history')}
         />
       )}
+      {view === 'dashboard' && (
+        <Dashboard div={div} quotations={divData.quotations} onOpen={openQuotation} onTrack={updateTracking} onShowHistory={() => { setFocusId(null); setView('history'); }} />
+      )}
       {view === 'history' && (
         <QuotationHistory
+          key={focusId || 'list'}
+          initialViewId={focusId}
+          onTrack={updateTracking}
           div={div}
           quotations={divData.quotations}
           onEdit={editFromHistory}

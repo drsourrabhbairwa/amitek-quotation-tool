@@ -78,6 +78,19 @@ export async function upsertQuotation(divKey, quotation) {
   return data && typeof data === 'object' ? data : quotation;
 }
 
+/** Changes only status / follow-up date / note of one quotation (no new
+ * revision). Returns the stored quotation, or null if the database has
+ * not been updated with set_quotation_tracking yet. */
+export async function setQuotationTracking(divKey, quotationId, patch) {
+  const { data, error } = await supabase.rpc('set_quotation_tracking', {
+    p_division_key: divKey,
+    p_quotation_id: quotationId,
+    p_patch: patch,
+  });
+  if (error) throw new Error(`Could not update status: ${error.message}`);
+  return data && typeof data === 'object' ? data : null;
+}
+
 /** Earlier saved versions of one quotation, newest first: [{ revision,
  * savedBy, savedAt, snapshot }]. The current version is the quotation
  * itself, not in this list. */
