@@ -59,7 +59,7 @@ export function blankQuotation(div, settings) {
   const template = getDefaultTermsTemplate(s);
   return {
     id: uid('qtn'), refNo: '', division: div.key, docType: 'quotation', date: todayStr(),
-    client: { name: '', contact: '', address: '', phone: '', state: '' },
+    client: { name: '', contact: '', address: '', phone: '', state: '', gstin: '' },
     showApplicator: false, applicator: { agency: '', contact: '', contractorName: '' },
     letterheadIdentity: 'division', // 'division' | 'company' — which identity this prints under
     showShipping: false,
@@ -121,7 +121,7 @@ export function reconcileQuotation(q, divKey, settings) {
   return {
     ...q,
     docType: q.docType || 'quotation',
-    client: { name: '', contact: '', address: '', phone: '', state: '', ...(q.client || {}) },
+    client: { name: '', contact: '', address: '', phone: '', state: '', gstin: '', ...(q.client || {}) },
     showApplicator: q.showApplicator || false,
     applicator: { agency: '', contact: '', contractorName: '', ...(q.applicator || {}) },
     letterheadIdentity: q.letterheadIdentity || 'division',

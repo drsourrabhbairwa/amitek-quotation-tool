@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
 import { DIVISIONS } from './lib/constants';
 import { blankQuotation, convertToProformaInvoice } from './lib/model';
@@ -12,6 +12,8 @@ import { AdminPanel } from './components/admin/AdminPanel';
 import { QuotationBuilder } from './components/QuotationBuilder';
 import { QuotationHistory } from './components/QuotationHistory';
 import { Dashboard } from './components/Dashboard';
+import { ClientsView } from './components/ClientsView';
+import { buildClientDirectory } from './lib/clients';
 import { SettingsPanel } from './components/settings/SettingsPanel';
 
 const PRINT_STYLES = `
@@ -98,6 +100,9 @@ export default function App() {
   }, []);
 
   const divData = division ? data[division] : null;
+  const clientDirectory = useMemo(
+    () => buildClientDirectory({ sf: data.sf?.quotations || [], wp: data.wp?.quotations || [] }),
+    [data.sf?.quotations, data.wp?.quotations]);
 
   const setDivDataAndPersist = (divKey) => (newDivData) => {
     setData(prev => ({ ...prev, [divKey]: newDivData }));
@@ -161,6 +166,12 @@ export default function App() {
   };
 
   const openQuotation = (q) => { setFocusId(q.id); setView('history'); };
+  const openQuotationIn = (divKey, q) => { setDivision(divKey); setFocusId(q.id); setView('history'); };
+  const newForClient = (c) => {
+    const blank = blankQuotation(DIVISIONS[division], data[division]?.settings);
+    setDraft({ ...blank, client: { ...blank.client, ...c.details } });
+    setView('new');
+  };
 
   const pickDivision = (key) => {
     setDivision(key);
@@ -278,11 +289,15 @@ export default function App() {
           setDivData={setDivDataAndPersist(division)}
           saveQuotation={saveQuotation}
           settings={divData.settings}
+          clients={clientDirectory}
           onSaved={() => setView('history')}
         />
       )}
       {view === 'dashboard' && (
         <Dashboard div={div} quotations={divData.quotations} onOpen={openQuotation} onTrack={updateTracking} onShowHistory={() => { setFocusId(null); setView('history'); }} />
+      )}
+      {view === 'clients' && (
+        <ClientsView div={div} directory={clientDirectory} onOpen={openQuotationIn} onNewForClient={newForClient} />
       )}
       {view === 'history' && (
         <QuotationHistory

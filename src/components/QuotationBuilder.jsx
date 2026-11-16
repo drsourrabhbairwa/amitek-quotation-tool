@@ -8,7 +8,7 @@ import { formatRefNo } from '../lib/calc';
 import { getNextCounterNumber } from '../lib/storage';
 import { downloadQuotationPdf } from '../lib/pdf';
 
-export function QuotationBuilder({ div, systems, draft, setDraft, onSaved, divData, setDivData, saveQuotation, settings }) {
+export function QuotationBuilder({ div, systems, draft, setDraft, onSaved, divData, setDivData, saveQuotation, settings, clients }) {
   const q = draft;
   const docRef = useRef(null);
   const printRef = useRef(null);
@@ -120,7 +120,7 @@ export function QuotationBuilder({ div, systems, draft, setDraft, onSaved, divDa
 
       <SystemPicker systems={systems} onAdd={addSystem} onAddBlank={addBlankRow} onAddSection={addSection} div={div} />
       <div ref={docRef}>
-        <QuotationDocument div={div} quotation={q} editable={true} onChange={updateQuotation} settings={settings} />
+        <QuotationDocument div={div} quotation={q} editable={true} onChange={updateQuotation} settings={settings} clients={clients} />
       </div>
       {/* Off-screen, read-only twin used only by "Download PDF". Exporting the
           live editable view baked empty-field borders, +/× buttons and

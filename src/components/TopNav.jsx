@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { FileText, History, Settings2, ArrowLeft, Download, Upload, SlidersHorizontal, LogOut, LayoutDashboard } from 'lucide-react';
+import { FileText, History, Settings2, ArrowLeft, Download, Upload, SlidersHorizontal, LogOut, LayoutDashboard, Users } from 'lucide-react';
 import { SavingIndicator } from './ui/atoms';
 
 export function TopNav({ div, view, setView, onSwitchDivision, savingState, onExport, onImportFile, onSignOut }) {
@@ -7,6 +7,7 @@ export function TopNav({ div, view, setView, onSwitchDivision, savingState, onEx
     { key: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
     { key: 'new', label: 'New Quotation', Icon: FileText },
     { key: 'history', label: 'History', Icon: History },
+    { key: 'clients', label: 'Clients', Icon: Users },
     { key: 'admin', label: 'Manage Systems', Icon: Settings2 },
     { key: 'settings', label: 'Settings', Icon: SlidersHorizontal },
   ];

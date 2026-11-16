@@ -13,7 +13,7 @@ import { SignatureBlock } from './SignatureBlock';
 import { ShippingDeliveryBlock } from './ShippingDeliveryBlock';
 import { EF } from '../ui/atoms';
 
-export function QuotationDocument({ div, quotation, editable, onChange, settings }) {
+export function QuotationDocument({ div, quotation, editable, onChange, settings, clients }) {
   const [editingLineItemId, setEditingLineItemId] = useState(null);
   const set = (patch) => onChange({ ...quotation, ...patch });
   const lineItems = quotation.lineItems;
@@ -65,7 +65,7 @@ export function QuotationDocument({ div, quotation, editable, onChange, settings
   return (
     <div className="bg-white rounded-lg border border-slate-200 p-4 sm:p-6 print-area text-slate-800" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
       <LetterheadHeader div={div} letterhead={resolvedLetterhead} docType={quotation.docType} refNo={quotation.refNo} revision={quotation.revision || 0} date={quotation.date} editable={editable} onDateChange={(v) => set({ date: v })} />
-      <ClientCard client={quotation.client} onChange={(c) => set({ client: c })} editable={editable} div={div} />
+      <ClientCard client={quotation.client} onChange={(c) => set({ client: c })} editable={editable} div={div} clients={clients} />
       {quotation.showApplicator && (
         <div className="border border-slate-200 rounded-md p-3 mb-3">
           <div className="text-xs font-semibold text-slate-500 mb-1.5">🛠 APPLICATOR / CONTRACTOR</div>
