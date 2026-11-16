@@ -1,7 +1,7 @@
 import React from 'react';
 import { AmitekLogo } from '../ui/atoms';
 
-export function LetterheadHeader({ div, letterhead, refNo, date, editable, onDateChange, docType }) {
+export function LetterheadHeader({ div, letterhead, refNo, date, editable, onDateChange, docType, revision }) {
   const lh = letterhead || {};
   const heading = docType === 'proforma' ? 'PROFORMA INVOICE' : 'QUOTATION';
   return (
@@ -18,7 +18,7 @@ export function LetterheadHeader({ div, letterhead, refNo, date, editable, onDat
         </div>
         <div className="sm:text-right shrink-0">
           <div className="font-bold text-slate-800 tracking-wide">{heading}</div>
-          <div className="text-xs text-slate-500 font-mono">Ref No: {refNo || 'will be assigned on save'}</div>
+          <div className="text-xs text-slate-500 font-mono">Ref No: {refNo || 'will be assigned on save'}{refNo && revision > 0 ? ` (Rev ${revision})` : ''}</div>
           <div className="text-xs text-slate-500 flex sm:justify-end items-center gap-1">
             Date: {editable
               ? <input type="text" value={date} onChange={e => onDateChange(e.target.value)} className="border-b border-slate-300 focus:outline-none w-24 text-xs" />

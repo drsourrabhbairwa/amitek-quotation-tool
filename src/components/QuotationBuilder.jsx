@@ -32,14 +32,17 @@ export function QuotationBuilder({ div, systems, draft, setDraft, onSaved, divDa
         return;
       }
     }
-    const finalQ = { ...q, refNo, updatedAt: Date.now() };
+    let finalQ = { ...q, refNo, updatedAt: Date.now() };
     setDraft(finalQ);
     try {
       // Saved as a single record (see lib/storage.js upsertQuotation) so
       // this never overwrites a quotation the other signed-in user saved
       // moments ago — the old approach sent this browser's whole
       // quotations array back, built from whatever it last loaded.
-      await saveQuotation(finalQ);
+      // The server returns the stored version with its revision number
+      // (Rev N) and who saved it, so use that from here on.
+      finalQ = (await saveQuotation(finalQ)) || finalQ;
+      setDraft(finalQ);
     } catch (e) {
       window.alert("Couldn't save — check your connection and try again. Your reference number was already assigned, so saving again will update this same document rather than skipping a number.");
       return;

@@ -64,7 +64,7 @@ export function QuotationDocument({ div, quotation, editable, onChange, settings
 
   return (
     <div className="bg-white rounded-lg border border-slate-200 p-4 sm:p-6 print-area text-slate-800" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-      <LetterheadHeader div={div} letterhead={resolvedLetterhead} docType={quotation.docType} refNo={quotation.refNo} date={quotation.date} editable={editable} onDateChange={(v) => set({ date: v })} />
+      <LetterheadHeader div={div} letterhead={resolvedLetterhead} docType={quotation.docType} refNo={quotation.refNo} revision={quotation.revision || 0} date={quotation.date} editable={editable} onDateChange={(v) => set({ date: v })} />
       <ClientCard client={quotation.client} onChange={(c) => set({ client: c })} editable={editable} div={div} />
       {quotation.showApplicator && (
         <div className="border border-slate-200 rounded-md p-3 mb-3">

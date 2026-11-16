@@ -121,7 +121,9 @@ export default function App() {
   };
 
   const saveQuotation = async (quotation) => {
-    await withSavingState(() => upsertQuotation(division, quotation));
+    let saved = quotation;
+    await withSavingState(async () => { saved = await upsertQuotation(division, quotation); });
+    return saved;
   };
 
   const pickDivision = (key) => {

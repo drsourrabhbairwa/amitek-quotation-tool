@@ -68,11 +68,28 @@ export async function saveDivisionData(divKey, data) {
  * upsert_quotation) against the row as it stands at call time, so it can
  * never clobber a quotation the other signed-in user saved moments ago. */
 export async function upsertQuotation(divKey, quotation) {
-  const { error } = await supabase.rpc('upsert_quotation', {
+  const { data, error } = await supabase.rpc('upsert_quotation', {
     p_division_key: divKey,
     p_quotation: quotation,
   });
   if (error) throw new Error(`Could not save: ${error.message}`);
+  // The server fills in revision / createdBy / updatedBy / savedAt. An
+  // older database function returned nothing, so fall back to what we sent.
+  return data && typeof data === 'object' ? data : quotation;
+}
+
+/** Earlier saved versions of one quotation, newest first: [{ revision,
+ * savedBy, savedAt, snapshot }]. The current version is the quotation
+ * itself, not in this list. */
+export async function listRevisions(divKey, quotationId) {
+  const { data, error } = await supabase
+    .from('quotation_revisions')
+    .select('revision, saved_by, saved_at, snapshot')
+    .eq('division_key', divKey)
+    .eq('quotation_id', quotationId)
+    .order('revision', { ascending: false });
+  if (error) throw new Error(`Could not load version history: ${error.message}`);
+  return (data || []).map(r => ({ revision: r.revision, savedBy: r.saved_by, savedAt: r.saved_at, snapshot: r.snapshot }));
 }
 
 /** Removes one quotation/proforma-invoice by id, leaving every other

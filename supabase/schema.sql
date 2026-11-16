@@ -95,23 +95,87 @@ $$;
 -- unsafe. Splitting by column (quotations vs systems vs settings) also
 -- means a systems edit can never step on a concurrent quotation save.
 
+-- Revision history: every time an EXISTING quotation is saved with a real
+-- content change, the version it replaces is archived here first and the
+-- quotation's own "revision" goes up by one (Rev 1, Rev 2, ...; printed
+-- next to the Ref No). A save that changes nothing but bookkeeping
+-- fields (updatedAt etc.) is not a new revision. Who saved each version
+-- comes from the signed-in user's own token (auth.jwt()), never from
+-- anything the browser claims.
+create table if not exists quotation_revisions (
+  id            bigint generated always as identity primary key,
+  division_key  text not null check (division_key in ('sf', 'wp')),
+  quotation_id  text not null,
+  revision      int  not null,
+  snapshot      jsonb not null,
+  saved_by      text,
+  saved_at      timestamptz not null default now()
+);
+create index if not exists quotation_revisions_lookup on quotation_revisions (division_key, quotation_id, revision);
+alter table quotation_revisions enable row level security;
+drop policy if exists "authenticated read/write" on quotation_revisions;
+create policy "authenticated read/write" on quotation_revisions
+  for all
+  using (auth.role() = 'authenticated')
+  with check (auth.role() = 'authenticated');
+
 -- Inserts p_quotation if no existing entry shares its id, otherwise
--- replaces that entry in place. Order among other quotations is not
--- preserved (the client sorts for display); this keeps the SQL simple.
+-- replaces that entry in place (archiving the old one as a revision if
+-- its content changed). Returns the quotation exactly as stored, with
+-- revision / createdBy / updatedBy / savedAt filled in by the server.
+-- Order among other quotations is not preserved (the client sorts for
+-- display); this keeps the SQL simple.
+drop function if exists upsert_quotation(text, jsonb);
 create or replace function upsert_quotation(p_division_key text, p_quotation jsonb)
-returns void
-language sql
+returns jsonb
+language plpgsql
 security invoker
 set search_path = public
 as $$
+declare
+  v_old  jsonb;
+  v_new  jsonb;
+  v_rev  int;
+  v_user text := coalesce(auth.jwt() ->> 'email', auth.jwt() ->> 'sub', 'unknown');
+  v_meta text[] := array['revision', 'updatedAt', 'updatedBy', 'createdBy', 'savedAt'];
+begin
+  -- Row lock first, so two people saving the same division at once are
+  -- serialized and each one compares against the other's committed save.
+  perform 1 from division_data where division_key = p_division_key for update;
+
+  select elem into v_old
+  from division_data d, jsonb_array_elements(d.quotations) elem
+  where d.division_key = p_division_key and elem ->> 'id' = p_quotation ->> 'id'
+  limit 1;
+
+  if v_old is null then
+    v_new := p_quotation || jsonb_build_object(
+      'revision', 0, 'createdBy', v_user, 'updatedBy', v_user, 'savedAt', now());
+  elsif (v_old - v_meta) is not distinct from (p_quotation - v_meta) then
+    return v_old; -- nothing actually changed
+  else
+    v_rev := coalesce((v_old ->> 'revision')::int, 0);
+    insert into quotation_revisions (division_key, quotation_id, revision, snapshot, saved_by, saved_at)
+    values (p_division_key, p_quotation ->> 'id', v_rev, v_old,
+            v_old ->> 'updatedBy', coalesce((v_old ->> 'savedAt')::timestamptz, now()));
+    v_new := p_quotation || jsonb_build_object(
+      'revision', v_rev + 1,
+      'createdBy', coalesce(v_old -> 'createdBy', to_jsonb(v_old ->> 'updatedBy'), 'null'::jsonb),
+      'updatedBy', v_user,
+      'savedAt', now());
+  end if;
+
   update division_data
   set quotations = (
         select coalesce(jsonb_agg(elem), '[]'::jsonb)
         from jsonb_array_elements(quotations) elem
-        where elem->>'id' <> (p_quotation->>'id')
-      ) || jsonb_build_array(p_quotation),
+        where elem ->> 'id' <> (p_quotation ->> 'id')
+      ) || jsonb_build_array(v_new),
       updated_at = now()
   where division_key = p_division_key;
+
+  return v_new;
+end;
 $$;
 
 -- Removes the quotation with the given id, if present.
@@ -129,6 +193,8 @@ as $$
       ),
       updated_at = now()
   where division_key = p_division_key;
+  delete from quotation_revisions
+  where division_key = p_division_key and quotation_id = p_quotation_id;
 $$;
 
 -- Replaces the whole Systems list. Editing the Systems tree is a single

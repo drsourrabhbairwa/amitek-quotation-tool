@@ -26,6 +26,7 @@ async function freshDb() {
   await db.exec(`
     create schema if not exists auth;
     create or replace function auth.role() returns text language sql as $$ select 'authenticated'::text $$;
+    create or replace function auth.jwt() returns jsonb language sql as $$ select coalesce(nullif(current_setting('test.jwt', true), ''), '{"email":"a@amitek.test"}')::jsonb $$;
   `);
   await db.exec(schemaSql);
   return db;
@@ -78,29 +79,28 @@ describe('per-record division_data writes (concurrent-save safety)', () => {
     await db.close();
   });
 
+  const META = ['revision', 'updatedAt', 'updatedBy', 'createdBy', 'savedAt'];
+  const strip = (q) => Object.fromEntries(Object.entries(q).filter(([k]) => !META.includes(k)));
   const quotations = async (divKey) =>
     (await db.query(`select quotations from division_data where division_key = $1`, [divKey])).rows[0].quotations;
+  const upsert = async (divKey, q) =>
+    (await db.query(`select upsert_quotation($1, $2::jsonb) as saved`, [divKey, JSON.stringify(q)])).rows[0].saved;
 
   it('upsert_quotation appends a new id and leaves other rows\' data untouched', async () => {
-    await db.query(`select upsert_quotation($1, $2::jsonb)`, ['sf', JSON.stringify({ id: 'q1', refNo: 'A1' })]);
-    await db.query(`select upsert_quotation($1, $2::jsonb)`, ['wp', JSON.stringify({ id: 'q-wp', refNo: 'W1' })]);
-    expect(await quotations('sf')).toEqual([{ id: 'q1', refNo: 'A1' }]);
-    expect(await quotations('wp')).toEqual([{ id: 'q-wp', refNo: 'W1' }]);
+    await upsert('sf', { id: 'q1', refNo: 'A1' });
+    await upsert('wp', { id: 'q-wp', refNo: 'W1' });
+    expect((await quotations('sf')).map(strip)).toEqual([{ id: 'q1', refNo: 'A1' }]);
+    expect((await quotations('wp')).map(strip)).toEqual([{ id: 'q-wp', refNo: 'W1' }]);
   });
 
   it('upsert_quotation replaces the existing entry with the same id instead of duplicating it', async () => {
-    await db.query(`select upsert_quotation($1, $2::jsonb)`, ['sf', JSON.stringify({ id: 'q1', refNo: 'A1-edited' })]);
-    expect(await quotations('sf')).toEqual([{ id: 'q1', refNo: 'A1-edited' }]);
+    await upsert('sf', { id: 'q1', refNo: 'A1-edited' });
+    expect((await quotations('sf')).map(strip)).toEqual([{ id: 'q1', refNo: 'A1-edited' }]);
   });
 
   it('simulates two users racing: both saves survive because each is computed against the row as it stood at call time, not a stale client snapshot', async () => {
-    // User A loads the row (currently just q1), then User B saves a brand
-    // new quotation q2 before A's own save reaches the server.
-    await db.query(`select upsert_quotation($1, $2::jsonb)`, ['sf', JSON.stringify({ id: 'q2', refNo: 'A2' })]);
-    // User A's save now runs — under the old whole-blob design this would
-    // have sent back A's stale in-memory array (just q1) and erased q2.
-    // The RPC instead recomputes server-side, so q2 survives.
-    await db.query(`select upsert_quotation($1, $2::jsonb)`, ['sf', JSON.stringify({ id: 'q1', refNo: 'A1-second-edit' })]);
+    await upsert('sf', { id: 'q2', refNo: 'A2' });
+    await upsert('sf', { id: 'q1', refNo: 'A1-second-edit' });
     const rows = await quotations('sf');
     expect(rows.map(r => r.id).sort()).toEqual(['q1', 'q2']);
     expect(rows.find(r => r.id === 'q1').refNo).toBe('A1-second-edit');
@@ -118,7 +118,53 @@ describe('per-record division_data writes (concurrent-save safety)', () => {
     const row = (await db.query(`select systems, settings, quotations from division_data where division_key = 'wp'`)).rows[0];
     expect(row.systems).toEqual([{ id: 'sys1' }]);
     expect(row.settings).toEqual({ gstin: 'TEST123' });
-    // Untouched by either call:
-    expect(row.quotations).toEqual([{ id: 'q-wp', refNo: 'W1' }]);
+    expect(row.quotations.map(strip)).toEqual([{ id: 'q-wp', refNo: 'W1' }]);
+  });
+});
+
+describe('quotation revisions', () => {
+  let db;
+  beforeAll(async () => { db = await freshDb(); });
+  afterAll(async () => { await db.close(); });
+
+  const upsert = async (q, email = 'a@amitek.test') => {
+    await db.exec(`select set_config('test.jwt', '{"email":"${email}"}', false)`);
+    return (await db.query(`select upsert_quotation('sf', $1::jsonb) as saved`, [JSON.stringify(q)])).rows[0].saved;
+  };
+  const revisions = async (id) =>
+    (await db.query(`select revision, saved_by, snapshot from quotation_revisions where quotation_id = $1 order by revision`, [id])).rows;
+
+  it('a brand-new quotation starts at Rev 0 with no archived versions, stamped with who saved it', async () => {
+    const saved = await upsert({ id: 'r1', refNo: 'R/1', total: 100 }, 'sourabh@amitek.test');
+    expect(saved.revision).toBe(0);
+    expect(saved.createdBy).toBe('sourabh@amitek.test');
+    expect(saved.updatedBy).toBe('sourabh@amitek.test');
+    expect(await revisions('r1')).toEqual([]);
+  });
+
+  it('re-saving with no real change (only updatedAt differs) is not a new revision', async () => {
+    const saved = await upsert({ id: 'r1', refNo: 'R/1', total: 100, updatedAt: 999 });
+    expect(saved.revision).toBe(0);
+    expect(await revisions('r1')).toEqual([]);
+  });
+
+  it('each real change archives the previous version and bumps the Rev number; createdBy is kept', async () => {
+    const s1 = await upsert({ id: 'r1', refNo: 'R/1', total: 150 }, 'shriya@amitek.test');
+    expect(s1.revision).toBe(1);
+    expect(s1.updatedBy).toBe('shriya@amitek.test');
+    expect(s1.createdBy).toBe('sourabh@amitek.test');
+    const s2 = await upsert({ ...s1, total: 175, revision: 0 /* stale client value is ignored */ });
+    expect(s2.revision).toBe(2);
+    const revs = await revisions('r1');
+    expect(revs.map(r => r.revision)).toEqual([0, 1]);
+    expect(revs[0].snapshot.total).toBe(100);
+    expect(revs[0].saved_by).toBe('sourabh@amitek.test');
+    expect(revs[1].snapshot.total).toBe(150);
+    expect(revs[1].saved_by).toBe('shriya@amitek.test');
+  });
+
+  it('deleting a quotation also deletes its revision history', async () => {
+    await db.query(`select delete_quotation('sf', 'r1')`);
+    expect(await revisions('r1')).toEqual([]);
   });
 });

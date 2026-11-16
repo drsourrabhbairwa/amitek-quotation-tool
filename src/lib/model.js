@@ -99,6 +99,7 @@ export function convertToProformaInvoice(quotation) {
     date: todayStr(),
     convertedFromId: quotation.id,
     convertedFromRefNo: quotation.refNo || null,
+    revision: 0, createdBy: null, updatedBy: null, savedAt: null,
     lineItems: (quotation.lineItems || []).map(li => ({ ...li, id: uid('li') })),
     termsBoxes: (quotation.termsBoxes || []).map(t => ({ ...t, id: uid('box') })),
     extraCharges: (quotation.extraCharges || []).map(c => ({ ...c, id: uid('ec') })),

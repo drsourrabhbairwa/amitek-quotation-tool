@@ -1,9 +1,45 @@
-import React, { useRef, useState } from 'react';
-import { Search, ArrowLeft, Printer, Pencil, Trash2, Download, Loader2, Receipt } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Search, ArrowLeft, Printer, Pencil, Trash2, Download, Loader2, Receipt, History, RotateCcw } from 'lucide-react';
 import { Btn, PrintOrientationStyle } from './ui/atoms';
 import { QuotationDocument } from './quotation/QuotationDocument';
 import { computeTotals, fmt } from '../lib/calc';
 import { downloadQuotationPdf } from '../lib/pdf';
+import { listRevisions } from '../lib/storage';
+
+const who = (email) => (email ? String(email).split('@')[0] : '');
+const when = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return isNaN(d) ? '' : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+/** Version strip shown above an opened quotation: the current version
+ * plus every earlier one the server archived (see schema.sql
+ * upsert_quotation). Picking an older one shows it read-only, ready to
+ * print/download, or to restore into the editor as a new revision. */
+function VersionStrip({ div, current, versions, selected, onSelect }) {
+  if (versions === 'loading') return <div className="no-print text-xs text-slate-400 mb-3 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Loading version history…</div>;
+  if (versions === 'error') return <div className="no-print text-xs text-slate-400 mb-3">Version history isn't available yet.</div>;
+  if (!Array.isArray(versions) || versions.length === 0) {
+    return current.savedAt || current.updatedBy
+      ? <div className="no-print text-xs text-slate-400 mb-3">Rev {current.revision || 0} · saved {when(current.savedAt)}{current.updatedBy ? ` by ${who(current.updatedBy)}` : ''} · no earlier versions</div>
+      : null;
+  }
+  const chip = (key, active, label, sub, onClick) => (
+    <button key={key} onClick={onClick} className={`text-left text-[11px] px-2.5 py-1 rounded-md border whitespace-nowrap ${active ? `${div.bg} text-white ${div.border}` : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
+      <span className="font-semibold">{label}</span><span className={active ? 'text-white/80' : 'text-slate-400'}> · {sub}</span>
+    </button>
+  );
+  return (
+    <div className="no-print mb-3">
+      <div className="text-xs text-slate-500 mb-1.5 flex items-center gap-1"><History size={12} /> Version history ({versions.length + 1} versions)</div>
+      <div className="flex gap-1.5 overflow-x-auto pb-1">
+        {chip('current', selected == null, `Rev ${current.revision || 0} (current)`, `${when(current.savedAt)}${current.updatedBy ? ` · ${who(current.updatedBy)}` : ''}`, () => onSelect(null))}
+        {versions.map(v => chip(v.revision, selected === v.revision, `Rev ${v.revision}`, `${when(v.savedAt)}${v.savedBy ? ` · ${who(v.savedBy)}` : ''}`, () => onSelect(v.revision)))}
+      </div>
+    </div>
+  );
+}
 
 export function QuotationHistory({ div, quotations, onEdit, onDelete, onConvertToPI, settings }) {
   const [viewing, setViewing] = useState(null);
@@ -12,6 +48,23 @@ export function QuotationHistory({ div, quotations, onEdit, onDelete, onConvertT
   const [docTypeFilter, setDocTypeFilter] = useState('all'); // 'all' | 'quotation' | 'proforma'
   const docRef = useRef(null);
   const [downloading, setDownloading] = useState(false);
+  const [versions, setVersions] = useState(null); // null | 'loading' | 'error' | [...]
+  const [selectedRev, setSelectedRev] = useState(null); // null = current
+
+  const viewingId = viewing?.id;
+  useEffect(() => {
+    setSelectedRev(null);
+    if (!viewingId) { setVersions(null); return; }
+    let cancelled = false;
+    setVersions('loading');
+    listRevisions(div.key, viewingId)
+      .then(v => { if (!cancelled) setVersions(v); })
+      .catch(() => { if (!cancelled) setVersions('error'); });
+    return () => { cancelled = true; };
+  }, [div.key, viewingId, viewing?.revision]);
+
+  const oldVersion = selectedRev != null && Array.isArray(versions) ? versions.find(v => v.revision === selectedRev) : null;
+  const shown = oldVersion ? { ...oldVersion.snapshot, revision: oldVersion.revision } : viewing;
 
   const filtered = [...quotations].reverse()
     .filter(item => docTypeFilter === 'all' || (item.docType || 'quotation') === docTypeFilter)
@@ -23,7 +76,8 @@ export function QuotationHistory({ div, quotations, onEdit, onDelete, onConvertT
     if (!docRef.current || downloading || !viewing) return;
     setDownloading(true);
     try {
-      const filename = `${(viewing.refNo || 'Quotation').replace(/\//g, '-')}.pdf`;
+      const rev = shown.revision > 0 ? `-Rev${shown.revision}` : '';
+      const filename = `${(shown.refNo || 'Quotation').replace(/\//g, '-')}${rev}.pdf`;
       await downloadQuotationPdf(docRef.current, filename, { orientation: viewing.pageOrientation || 'portrait' });
     } catch (e) {
       window.alert("Couldn't generate the PDF: " + e.message);
@@ -47,14 +101,24 @@ export function QuotationHistory({ div, quotations, onEdit, onDelete, onConvertT
             <Btn variant="outline" onClick={handleDownloadPdf} disabled={downloading}>
               {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Download PDF
             </Btn>
-            {(viewing.docType || 'quotation') !== 'proforma' && (
+            {!oldVersion && (viewing.docType || 'quotation') !== 'proforma' && (
               <Btn variant="outline" onClick={() => onConvertToPI(viewing)}><Receipt size={14} /> Convert to Proforma Invoice</Btn>
             )}
-            <Btn accentClasses={`${div.bg} text-white ${div.bgHover}`} onClick={() => onEdit(viewing)}><Pencil size={14} /> Edit</Btn>
+            {oldVersion ? (
+              <Btn accentClasses={`${div.bg} text-white ${div.bgHover}`} onClick={() => onEdit({ ...oldVersion.snapshot, revision: viewing.revision, createdBy: viewing.createdBy, updatedBy: viewing.updatedBy, savedAt: viewing.savedAt })} title="Opens this old version in the editor; saving it becomes the next revision"><RotateCcw size={14} /> Restore this version</Btn>
+            ) : (
+              <Btn accentClasses={`${div.bg} text-white ${div.bgHover}`} onClick={() => onEdit(viewing)}><Pencil size={14} /> Edit</Btn>
+            )}
           </div>
         </div>
+        <VersionStrip div={div} current={viewing} versions={versions} selected={selectedRev} onSelect={setSelectedRev} />
+        {oldVersion && (
+          <div className="no-print mb-3 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-md px-3 py-2">
+            You're viewing an older version — Rev {oldVersion.revision}, saved {when(oldVersion.savedAt)}{oldVersion.savedBy ? ` by ${who(oldVersion.savedBy)}` : ''}. The current version is Rev {viewing.revision || 0}.
+          </div>
+        )}
         <div ref={docRef}>
-          <QuotationDocument div={div} quotation={viewing} editable={false} onChange={() => {}} settings={settings} />
+          <QuotationDocument div={div} quotation={shown} editable={false} onChange={() => {}} settings={settings} />
         </div>
       </div>
     );
@@ -82,7 +146,9 @@ export function QuotationHistory({ div, quotations, onEdit, onDelete, onConvertT
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-mono text-xs text-slate-400">{item.refNo}</span>
                   {item.docType === 'proforma' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-medium">PI</span>}
+                  {item.revision > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">Rev {item.revision}</span>}
                   <span className="text-xs text-slate-400">{item.date}</span>
+                  {item.updatedBy && <span className="text-[11px] text-slate-400">· last saved by {who(item.updatedBy)}{item.savedAt ? `, ${when(item.savedAt)}` : ''}</span>}
                 </div>
                 <div className="font-medium text-slate-800 text-sm truncate mt-0.5">{item.client?.name || 'Untitled client'}</div>
                 <div className={`text-sm font-semibold ${div.text} mt-0.5`}>₹ {fmt(grand)}{advanceTotal > 0 && <span className="text-xs font-normal text-slate-500"> · Advance ₹ {fmt(advanceTotal)} · Balance ₹ {fmt(balance)}</span>}</div>
