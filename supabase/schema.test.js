@@ -224,3 +224,25 @@ describe('attendance-app access gate (quote_access_ok)', () => {
     expect(await as('staff@amitek.test')).toBe(false);
   });
 });
+
+describe('waterproofing calculator tables', () => {
+  let db;
+  beforeAll(async () => {
+    db = await freshDb();
+    await db.exec(`do $$ begin create role anon; exception when others then null; end $$; do $$ begin create role authenticated; exception when others then null; end $$;`);
+    await db.exec(readFileSync(join(__dirname, 'calculator.sql'), 'utf8'));
+  });
+  afterAll(async () => { await db.close(); });
+  const lead = (o = {}) => db.query(
+    `insert into calculator_leads (name, phone, surface, project, area_sqft, pincode) values ($1,$2,$3,$4,$5,$6)`,
+    [o.name ?? 'Ravi', o.phone ?? '9876543210', o.surface ?? 'terrace', o.project ?? 'repair', o.area ?? 500, o.pin ?? '302020']);
+  it('accepts a valid lead', async () => { await lead(); });
+  it('rejects a bad phone, pincode or project type', async () => {
+    await expect(lead({ phone: '12345' })).rejects.toThrow();
+    await expect(lead({ pin: '0123' })).rejects.toThrow();
+    await expect(lead({ project: 'other' })).rejects.toThrow();
+  });
+  it('keeps exactly one config row', async () => {
+    await expect(db.exec(`insert into calculator_config (id) values (2)`)).rejects.toThrow();
+  });
+});

@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Calculator Admin · Amitek</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0b2b33;--soft:#5d7378;--line:#d7e3e2;--mist:#eef5f4;--teal:#0e7a74;--teal-l:#d9efec;--red:#b4232a;--ok:#1f8f4e}
+[hidden]{display:none!important}
+*{box-sizing:border-box}body{margin:0;font-family:Manrope,system-ui,sans-serif;color:var(--ink);background:var(--mist);font-size:14px}
+button,input,select,textarea{font:inherit;color:inherit}
+.bar{background:var(--ink);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.bar b{letter-spacing:.25em}.bar a{color:#cfe;font-size:13px}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tabs button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 14px;font-weight:600;cursor:pointer}
+.tabs button[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.box{background:#fff;border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+h2{font-size:15px;margin:0 0 12px}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+label{display:block;font-size:12px;font-weight:600;color:#2f4a50;margin-bottom:4px}
+input,select,textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff}
+textarea{min-height:90px;resize:vertical}
+.rates{display:grid;grid-template-columns:repeat(4,minmax(70px,1fr));gap:8px}
+.btn{border:0;border-radius:10px;padding:10px 16px;font-weight:700;cursor:pointer;background:var(--teal);color:#fff}
+.btn.sec{background:#fff;border:1px solid var(--line);color:var(--ink)}
+.msg{font-size:13px;margin-left:10px}.msg.bad{color:var(--red)}.msg.good{color:var(--ok)}
+details.s{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#fff}
+details.s summary{padding:12px 14px;cursor:pointer;font-weight:700;display:flex;justify-content:space-between;gap:10px}
+details.s summary span{font-weight:500;color:var(--soft);font-size:13px}
+details.s .in{padding:0 14px 14px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--soft)}
+.tbl{overflow-x:auto}
+.login{max-width:360px;margin:60px auto}
+.warn{background:#fff8ec;border-left:3px solid #e8a33d;padding:10px 12px;border-radius:0 8px 8px 0;font-size:13px;margin-bottom:14px}
+</style>
+</head>
+<body>
+<div class="bar"><b>AMITEK</b><span>Waterproofing calculator · admin</span><span><a href="./" target="_blank">Open calculator ↗</a> <button class="btn sec" id="out" hidden style="padding:5px 10px;margin-left:8px">Sign out</button></span></div>
+
+<div class="wrap">
+  <div class="box login" id="loginBox" hidden>
+    <h2>Sign in with your Quotation Tool login</h2>
+    <label for="em">Email</label><input id="em" type="email" autocomplete="username">
+    <label for="pw" style="margin-top:10px">Password</label><input id="pw" type="password" autocomplete="current-password">
+    <div style="margin-top:12px"><button class="btn" id="signin">Sign in</button><span class="msg" id="lmsg"></span></div>
+  </div>
+
+  <div id="app" hidden>
+    <div class="tabs"><button data-tab="rates" aria-pressed="true">Rates &amp; text</button><button data-tab="leads" aria-pressed="false">Leads</button></div>
+
+    <div id="tab-rates">
+      <div class="warn">Rates are per sq.ft, supply + application (material + labour), before GST. The customer sees the range from the lower to the higher number; turn off "Show range" to show only the higher number.</div>
+      <div class="box"><h2>General</h2><div class="g">
+        <div><label>Company name</label><input data-k="company"></div>
+        <div><label>WhatsApp number (with 91)</label><input data-k="whatsapp"></div>
+        <div><label>Phone shown</label><input data-k="phone"></div>
+        <div><label>Email</label><input data-k="email"></div>
+        <div><label>GST %</label><input data-k="gstPercent" type="number"></div>
+        <div><label>Minimum area (sq.ft)</label><input data-k="minArea" type="number"></div>
+        <div><label>Minimum job charge (₹)</label><input data-k="minJobCharge" type="number"></div>
+        <div><label>Show range</label><select data-k="showRange"><option value="true">Yes: lower – higher</option><option value="false">No: only the higher number</option></select></div>
+      </div><div style="margin-top:10px"><label>Note under every estimate</label><textarea data-k="footnote" style="min-height:60px"></textarea></div></div>
+      <div class="box"><h2>Areas</h2><div id="surfs"></div></div>
+      <div style="position:sticky;bottom:0;background:var(--mist);padding:10px 0"><button class="btn" id="save">Save changes</button><button class="btn sec" id="reset" style="margin-left:8px">Load starting values</button><span class="msg" id="smsg"></span></div>
+    </div>
+
+    <div id="tab-leads" hidden>
+      <div class="box"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px"><h2 style="margin:0">Leads from the calculator</h2><span><button class="btn sec" id="reload">Refresh</button> <button class="btn" id="csv">Download CSV</button></span></div>
+        <div class="tbl"><table><thead><tr><th>When</th><th>Name / phone</th><th>Place</th><th>Area</th><th>Estimate</th><th>Start</th><th>Source</th><th>Status</th></tr></thead><tbody id="leads"></tbody></table></div>
+        <p class="msg" id="lsmsg" style="margin:10px 0 0"></p></div>
+    </div>
+  </div>
+</div>
+
+<script src="core.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+(function(){
+'use strict';
+var sb=supabase.createClient('https://cqbqimavnuptmcoohhyc.supabase.co','sb_publishable_1PFft8-BYVGWkQ3kVr_Ywg_WOpGaWnk');
+var C=window.AmkCalc, $=function(id){return document.getElementById(id)}, saved={}, cfg=null, leads=[];
+var esc=function(t){return String(t==null?'':t).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
+
+function fill(){
+  document.querySelectorAll('[data-k]').forEach(function(el){ el.value=String(cfg[el.dataset.k]); });
+  var all=C.mergeConfig(Object.assign({},saved,{surfaces:(saved.surfaces||[]).map(function(s){return Object.assign({},s,{hidden:false})})})).surfaces;
+  $('surfs').innerHTML=all.map(function(s){
+    var o=(saved.surfaces||[]).filter(function(x){return x.key===s.key})[0]||{}, r=s.rates;
+    return '<details class="s" data-key="'+esc(s.key)+'"><summary>'+esc(s.label)+' <span>New ₹'+r.fresh[0]+'–'+r.fresh[1]+' · Repair ₹'+r.repair[0]+'–'+r.repair[1]+' /sq.ft'+(o.hidden?' · hidden':'')+'</span></summary><div class="in">'+
+      '<div class="g"><div><label>Name shown</label><input data-f="label" value="'+esc(s.label)+'"></div><div><label>Short line</label><input data-f="blurb" value="'+esc(s.blurb)+'"></div><div><label>Show on calculator</label><select data-f="hidden"><option value="false">Yes</option><option value="true"'+(o.hidden?' selected':'')+'>No, hide it</option></select></div></div>'+
+      '<label style="margin-top:10px">Rates per sq.ft (₹)</label><div class="rates"><div><label>New · low</label><input type="number" data-r="fresh0" value="'+r.fresh[0]+'"></div><div><label>New · high</label><input type="number" data-r="fresh1" value="'+r.fresh[1]+'"></div><div><label>Repair · low</label><input type="number" data-r="repair0" value="'+r.repair[0]+'"></div><div><label>Repair · high</label><input type="number" data-r="repair1" value="'+r.repair[1]+'"></div></div>'+
+      '<div style="margin-top:10px"><label>Recommended system</label><input data-f="system" value="'+esc(s.system)+'"></div>'+
+      '<div class="g" style="margin-top:10px"><div><label>Steps (one per line)</label><textarea data-f="steps">'+esc((s.steps||[]).join('\n'))+'</textarea></div><div><label>Problems to pick from (one per line)</label><textarea data-f="problems">'+esc((s.problems||[]).join('\n'))+'</textarea></div></div>'+
+      '<div style="margin-top:10px"><label>Note (what is not included)</label><input data-f="notes" value="'+esc(s.notes||'')+'"></div></div></details>';
+  }).join('');
+}
+
+function collect(){
+  var out={};
+  document.querySelectorAll('[data-k]').forEach(function(el){ var k=el.dataset.k, v=el.value; out[k]=k==='showRange'?v==='true':el.type==='number'?(+v||0):v.trim(); });
+  out.surfaces=[].map.call(document.querySelectorAll('details.s'),function(d){
+    var g=function(f){return d.querySelector('[data-f="'+f+'"]').value}, r=function(k){return +d.querySelector('[data-r="'+k+'"]').value||0};
+    var lines=function(f){return g(f).split('\n').map(function(x){return x.trim()}).filter(Boolean)};
+    return {key:d.dataset.key,label:g('label').trim(),blurb:g('blurb').trim(),hidden:g('hidden')==='true',system:g('system').trim(),notes:g('notes').trim(),steps:lines('steps'),problems:lines('problems'),
+      rates:{fresh:[r('fresh0'),Math.max(r('fresh0'),r('fresh1'))],repair:[r('repair0'),Math.max(r('repair0'),r('repair1'))]}};
+  });
+  return out;
+}
+
+async function loadCfg(){
+  var r=await sb.from('calculator_config').select('data').eq('id',1).maybeSingle();
+  if(r.error){ $('smsg').className='msg bad'; $('smsg').textContent='Could not load saved rates: '+r.error.message+' (has calculator.sql been run?)'; }
+  saved=(r.data&&r.data.data)||{}; cfg=C.mergeConfig(saved); fill();
+}
+$('save').onclick=async function(){
+  var data=collect(), u=(await sb.auth.getUser()).data.user;
+  var r=await sb.from('calculator_config').upsert({id:1,data:data,updated_at:new Date().toISOString(),updated_by:u&&u.email});
+  $('smsg').className='msg '+(r.error?'bad':'good'); $('smsg').textContent=r.error?'Not saved: '+r.error.message:'Saved. The calculator uses these rates now.';
+  if(!r.error){ saved=data; cfg=C.mergeConfig(saved); fill(); }
+};
+$('reset').onclick=function(){ if(!confirm('Fill the form with the starting rates and text? Nothing is saved until you press Save.')) return; saved={}; cfg=C.mergeConfig(null); fill(); };
+
+var SURF=function(k){var s=(cfg||C.DEFAULTS).surfaces.concat(C.DEFAULTS.surfaces).filter(function(x){return x.key===k})[0]; return s?s.label:k};
+async function loadLeads(){
+  $('lsmsg').textContent='Loading…';
+  var r=await sb.from('calculator_leads').select('*').order('created_at',{ascending:false}).limit(1000);
+  if(r.error){ $('lsmsg').className='msg bad'; $('lsmsg').textContent='Could not load leads: '+r.error.message; return; }
+  leads=r.data||[]; $('lsmsg').className='msg'; $('lsmsg').textContent=leads.length+' lead'+(leads.length===1?'':'s');
+  $('leads').innerHTML=leads.map(function(l){
+    return '<tr><td>'+new Date(l.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})+'</td>'+
+      '<td><b>'+esc(l.name)+'</b><br><a href="tel:+91'+esc(l.phone)+'">'+esc(l.phone)+'</a> · <a target="_blank" rel="noopener" href="https://wa.me/91'+esc(l.phone)+'">WhatsApp</a>'+(l.whatsapp_ok?'':' <span style="color:var(--soft)">(no WA updates)</span>')+'</td>'+
+      '<td>'+esc([l.city,l.pincode].filter(Boolean).join(' '))+'</td>'+
+      '<td>'+esc(SURF(l.surface))+' · '+(l.project==='repair'?'Repair':'New')+'<br>'+Math.round(l.area_sqft).toLocaleString('en-IN')+' sq.ft'+(l.problems?'<br><span style="color:var(--soft)">'+esc(l.problems)+'</span>':'')+'</td>'+
+      '<td>'+(l.estimate_max?C.inr(l.estimate_min)+' – '+C.inr(l.estimate_max):'')+'</td><td>'+esc(l.start_when||'')+'</td><td style="max-width:160px;word-break:break-all;color:var(--soft)">'+esc(l.source||'')+'</td>'+
+      '<td><select data-lead="'+l.id+'">'+['new','contacted','quoted','won','lost'].map(function(s){return '<option'+(s===l.status?' selected':'')+'>'+s+'</option>'}).join('')+'</select></td></tr>';
+  }).join('')||'<tr><td colspan="8" style="color:var(--soft);padding:20px 6px">No leads yet.</td></tr>';
+}
+document.addEventListener('change',async function(e){
+  var id=e.target.dataset&&e.target.dataset.lead; if(!id) return;
+  var r=await sb.from('calculator_leads').update({status:e.target.value}).eq('id',id);
+  if(r.error) alert('Not saved: '+r.error.message);
+});
+$('reload').onclick=loadLeads;
+$('csv').onclick=function(){
+  var cols=['created_at','name','phone','email','city','pincode','surface','project','problems','area_sqft','estimate_min','estimate_max','start_when','whatsapp_ok','status','source'];
+  var q=function(v){v=v==null?'':String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  var csv=[cols.join(',')].concat(leads.map(function(l){return cols.map(function(c){return q(l[c])}).join(',')})).join('\n');
+  var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv'})); a.download='amitek-calculator-leads.csv'; a.click();
+};
+document.querySelectorAll('[data-tab]').forEach(function(b){ b.onclick=function(){
+  document.querySelectorAll('[data-tab]').forEach(function(x){x.setAttribute('aria-pressed',x===b)});
+  $('tab-rates').hidden=b.dataset.tab!=='rates'; $('tab-leads').hidden=b.dataset.tab!=='leads'; if(b.dataset.tab==='leads') loadLeads();
+}; });
+
+$('signin').onclick=async function(){
+  $('lmsg').textContent='';
+  var r=await sb.auth.signInWithPassword({email:$('em').value.trim(),password:$('pw').value});
+  if(r.error){ $('lmsg').className='msg bad'; $('lmsg').textContent=r.error.message; return; }
+  start();
+};
+$('out').onclick=async function(){ await sb.auth.signOut(); location.reload(); };
+async function start(){
+  var s=(await sb.auth.getSession()).data.session;
+  $('loginBox').hidden=!!s; $('app').hidden=!s; $('out').hidden=!s;
+  if(s) loadCfg();
+}
+start();
+})();
+</script>
+</body>
+</html>
